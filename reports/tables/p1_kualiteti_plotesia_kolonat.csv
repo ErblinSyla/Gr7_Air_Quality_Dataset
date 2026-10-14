@@ -1,0 +1,17 @@
+kolona,null,pct_null
+station_id,0,0.0
+pollutant_code,0,0.0
+pollutant,0,0.0
+instrument,0,0.0
+sampling_point_id,0,0.0
+ts_utc,0,0.0
+ts_end,0,0.0
+value_raw,0,0.0
+unit,0,0.0
+agg_type,0,0.0
+validity,0,0.0
+verification,0,0.0
+result_time,0,0.0
+data_capture,4261594,100.0
+fk_observation_log,0,0.0
+ts_local,0,0.0
