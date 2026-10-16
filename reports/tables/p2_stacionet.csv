@@ -1,0 +1,13 @@
+station_id,station_name,national_code,town,lat,lon,altitude_m,distance_km,coords_from,station_type,station_area,name_variants,national_code_variants
+XK0001A,Prishtine1,KS0101A,Prishtinë,42.64883,21.13711,573.0,2.8,2024_komuna,background,suburban,AQMS Prishtine - IHMK | Prishtine-HMIK | Prishtine1,KS0101 | KS0101A
+XK0002A,Prishtine2,KS0102A,Prishtinë,42.65964,21.15732,583.0,0.8,2024_komuna,traffic,urban,AQMS Prishtine Rilindje | Prishtine-Build ex Rilindja | Prishtine2,KS0102 | KS0102A
+XK0003A,Drenas,KS0103A,Drenas,42.62528,20.89105,580.0,0.2,2024_komuna,industrial,urban,Drenas | Drenas-Municipality,KS0103 | KS0103A
+XK0004A,Mitrovice,KS0204,Mitrovicë,42.8918,20.8689,489.0,0.3,2024,background,urban,Mitrovice,KS0204 | XK0004A
+XK0005A,Peje,KS0305,Pejë,42.6657,20.3051,509.0,1.5,2024,background,urban,AQMS Peje | Peje,KS0305 | XK0005A
+XK0006A,Prizren,KS0406,Prizren,42.2199,20.7279,479.0,1.2,2024,background,urban,AQMS Prizren | Prizren,KS0406 | XK0006A
+XK0007A,Brezovica,KS0507A,Brezovicë,42.18817,21.03019,1803.0,1.6,2024_komuna,background,rural-remote,AQMS Brezovica | Brezovica,KS0507 | KS0507A | XK0007A
+XK0008A,Hani i Elezit,KS0508,Hani i Elezit,42.154,21.296,399.0,0.6,2024,industrial,suburban,AQMS Hani i Elezit | Hani i Elezit,KS0508 | XK0008A
+XK0009A,Gjilan,KS0609,Gjilan,42.4678,21.4604,499.0,0.8,2024,traffic,urban,AQMS Gjilan | Gjilan,KS0609 | XK0009A
+XK0010A,Palaj,KS0110,Palaj (Obiliq),42.6779,21.0528,509.0,0.3,2024,industrial,suburban,AQMS Palaj | Palaj,KS0110 | XK0010A
+XK0011A,Obiliq,KS0111,Obiliq,42.6839,21.0733,519.0,0.4,2024,industrial,urban,AQMS Obiliq | Obiliq,KS0111 | XK0011A
+XK0012A,Dardhishtë,KS0112,Dardhishtë (Obiliq),42.6597,21.0833,529.0,0.3,2024,industrial,suburban,AQMS Dardhishte | Dardhishtë,KS0112 | XK0012A
