@@ -18,6 +18,3 @@ env/
 .vscode/
 .DS_Store
 Thumbs.db
-
-# Plan screenshots in repo root
-/reports/figures/*.png
