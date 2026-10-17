@@ -1,0 +1,8 @@
+atributi,stacione_me_konflikt,shembull_XK0002A
+station_name,11,"['AQMS Prishtine Rilindje', 'Prishtine-Build ex Rilindja', 'Prishtine2']"
+national_code,12,"['KS0102', 'KS0102A']"
+lat,9,"[42.39347, 42.65964]"
+lon,11,"[21.09264, 21.15732]"
+altitude_m,5,[583.0]
+station_type,7,"['background', 'traffic']"
+station_area,1,['urban']
