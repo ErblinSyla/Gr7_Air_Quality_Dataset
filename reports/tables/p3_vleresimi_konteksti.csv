@@ -1,0 +1,41 @@
+L,method,n,MAE,RMSE,konteksti
+1,ffill,4129,3.24663,6.199158,periudhë e qetë
+1,linear,4129,2.354448,4.721731,periudhë e qetë
+1,profile,4129,8.274433,12.790759,periudhë e qetë
+1,station_median,4129,9.075338,14.361379,periudhë e qetë
+3,ffill,12704,4.770069,10.224384,periudhë e qetë
+3,linear,12704,3.2888,6.748315,periudhë e qetë
+3,profile,12704,8.550999,13.846216,periudhë e qetë
+3,station_median,12704,9.351543,15.769935,periudhë e qetë
+6,ffill,26513,5.958158,11.42109,periudhë e qetë
+6,linear,26513,4.193526,7.946656,periudhë e qetë
+6,profile,26513,8.065997,12.486111,periudhë e qetë
+6,station_median,26513,9.071927,14.45749,periudhë e qetë
+12,ffill,56895,7.316708,13.230253,periudhë e qetë
+12,linear,56895,5.657527,10.437341,periudhë e qetë
+12,profile,56895,8.210601,12.595158,periudhë e qetë
+12,station_median,56895,9.174599,14.448967,periudhë e qetë
+24,ffill,156939,7.051805,13.403032,periudhë e qetë
+24,linear,156939,6.230825,11.925418,periudhë e qetë
+24,profile,156939,7.548376,12.354355,periudhë e qetë
+24,station_median,156939,8.705149,14.310571,periudhë e qetë
+1,ffill,14471,3.562529,8.887849,pranë boshllëkut real (±24h)
+1,linear,14471,2.434659,6.604912,pranë boshllëkut real (±24h)
+1,profile,14471,8.939108,18.116397,pranë boshllëkut real (±24h)
+1,station_median,14471,10.709413,21.444839,pranë boshllëkut real (±24h)
+3,ffill,43096,5.305569,13.021875,pranë boshllëkut real (±24h)
+3,linear,43096,3.497502,8.684996,pranë boshllëkut real (±24h)
+3,profile,43096,8.845884,18.398206,pranë boshllëkut real (±24h)
+3,station_median,43096,10.578264,21.520375,pranë boshllëkut real (±24h)
+6,ffill,85087,7.036262,16.066912,pranë boshllëkut real (±24h)
+6,linear,85087,4.823286,11.113752,pranë boshllëkut real (±24h)
+6,profile,85087,8.837541,17.921971,pranë boshllëkut real (±24h)
+6,station_median,85087,10.648256,21.298111,pranë boshllëkut real (±24h)
+12,ffill,157473,9.425049,21.072215,pranë boshllëkut real (±24h)
+12,linear,157473,7.160985,15.731703,pranë boshllëkut real (±24h)
+12,profile,157473,9.264711,18.867836,pranë boshllëkut real (±24h)
+12,station_median,157473,11.293336,22.451343,pranë boshllëkut real (±24h)
+24,ffill,131973,11.097544,22.566945,pranë boshllëkut real (±24h)
+24,linear,131973,10.37393,21.010675,pranë boshllëkut real (±24h)
+24,profile,131973,10.324903,21.785764,pranë boshllëkut real (±24h)
+24,station_median,131973,11.881171,24.678457,pranë boshllëkut real (±24h)
