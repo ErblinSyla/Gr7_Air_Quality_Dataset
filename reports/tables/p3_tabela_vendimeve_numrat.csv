@@ -1,0 +1,17 @@
+Kategoria,Veprimi,Numri,Imputohet?
+Ndotës që stacioni s'e mat,not_measured,134196,Kurrë
+Para fillimit / pas mbarimit të serisë,outside_period,50819,Kurrë
+Orë që mungon fare,missing_row,376695,Sipas gjatësisë
+E pavlefshme / mirëmbajtje (Validity −1/−99),null_invalid,404961,Sipas gjatësisë
+"Sentinel / absurde (të gjitha kanë edhe Validity −1/−99, D11)",null_sentinel / null_absurd,0,Sipas gjatësisë
+"NO/NO2 para ndërrimit të analizuesit, nëntor 2019 (D33)",null_calibration,98812,Sipas gjatësisë (në praktikë > 24h → mbetet null)
+Mbi kufirin fizik,null_physical,0,Sipas gjatësisë
+Nën pragun e detektimit (Validity 2),mbahet,873,–
+Negative e vogël,→ 0 (zero_negative),10378,–
+Negative e madhe,null_negative,3112,Sipas gjatësisë
+"Vlerë e ngecur (jo-zero, ose zero te PM10, PM2_5, NO2, NOx)",null_stuck,3171,Sipas gjatësisë
+Zero e ngecur te CO/O3/SO2/NO,mbahet,5252,–
+Majë e izoluar,null_spike,473,Sipas gjatësisë
+PM2.5 > PM10 brenda tolerancës,mbahen të dyja,1574,–
+PM2.5 > PM10 jashtë tolerancës + NOx jokonsistent (D10),null_inconsistent,53166,"Sipas gjatësisë; NOx deterministikisht kur NO, NO2 janë të vlefshme"
+Outlier statistikë,"mbahet, vetëm flamur",61892,–
