@@ -1,0 +1,10 @@
+kolona,arsyeja
+DataCapture,100% bosh
+AggType,"konstante (gjithmonë 'hour'), variancë zero"
+Verification,"konstante (gjithmonë 1), variancë zero"
+End,e tepërt: End = Start + 1h (0 përjashtime)
+ResultTime,"administrative: koha e publikimit, s'lidhet me ndotjen"
+FkObservationLog,identifikues administrativ
+Unit,e tepërt pas harmonizimit (të gjitha në njësi kanonike)
+Samplingpoint,e zbërthyer në station_id dhe pollutant
+Validity,e përthithur te clean_action/status (p2–p3)
