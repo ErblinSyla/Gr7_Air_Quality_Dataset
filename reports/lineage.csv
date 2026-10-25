@@ -1,0 +1,9 @@
+skripta,hapi,rreshta_para,rreshta_pas,null_para,null_pas
+p1,mbledhja: raw → bronze,4261594,4261594,0,0
+p1,metadata: Evropa → Kosova,187994,222,0,0
+p2,metadata: deduplikim,222,12,0,0
+p2,pastrimi: bronze → silver,4261594,4261594,0,563695
+p3,rrjeti orar + imputimi → gold,4261594,4823304,940390,493799
+p4,agregimi orar → ditor,4638289,193292,940390,45488
+p4,mostrimi i stratifikuar 10%,602913,60291,0,0
+p5,formati i gjerë + vetitë → gold,602913,602913,0,0
