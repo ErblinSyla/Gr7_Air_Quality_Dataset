@@ -1,0 +1,8 @@
+column,unique_values,pct_null,verdict
+data_capture,1,100.0,100% empty
+agg_type,1,0.0,constant
+verification,1,0.0,constant
+fk_observation_log,558,0.0,"administrative identifier, no information about pollution"
+unit,2,0.0,"fully determined by the pollutant (CO mg/m³, others µg/m³): redundant"
+result_time,6,0.0,"administrative: publication time, unrelated to the measurement"
+ts_end,,0.0,redundant: End = Start + 1h (exceptions: 0)

@@ -1,0 +1,9 @@
+pollutant,declared_unit
+SO2,ug.m-3
+PM10,ug.m-3
+PM2_5,ug.m-3
+O3,ug.m-3
+NO2,ug.m-3
+NOx,ug.m-3
+CO,mg.m-3
+NO,ug.m-3

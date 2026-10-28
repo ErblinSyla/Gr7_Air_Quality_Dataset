@@ -1,7 +1,7 @@
-pm25_bin_eaqi,count,klasa,pct
-0,104537,e mirë,18.6
-1,265719,mjaftueshme,47.3
-2,158589,mesatare,28.2
-3,25096,e dobët,4.5
-4,6162,shumë e dobët,1.1
-5,1382,jashtëzakonisht e dobët,0.2
+pm25_bin_eaqi,count,class,pct
+0,104537,good,18.6
+1,265719,fair,47.3
+2,158589,moderate,28.2
+3,25096,poor,4.5
+4,6162,very poor,1.1
+5,1382,extremely poor,0.2

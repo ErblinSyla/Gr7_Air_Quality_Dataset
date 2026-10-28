@@ -1,0 +1,7 @@
+dimension,key_question,finding
+Accuracy,Are the values correct?,"404,961 invalid (Validity −1/−99), 328,829 sentinel −9900, 13,490 negative, 9,187 stuck hours, 666 spikes"
+Completeness,Is anything missing?,"376,695 hours without a row; DataCapture 100% empty"
+Consistency,Do related values agree?,PM2.5 > PM10 in 924 hours; NOx is in ppb although labelled µg/m³
+Timeliness,Is the data updated in time?,"results are published 358–455 days (median per year) after measurement: E1a is a verified series, not real-time data"
+Believability,How much can the data be trusted?,"official source (EEA, IHMK monitoring network); Verification = [1] (verified) for every row"
+Interpretability,How easily can the data be understood?,"codes (Pollutant 6001, Validity −99) are meaningless without a description → data dictionary (2.2)"

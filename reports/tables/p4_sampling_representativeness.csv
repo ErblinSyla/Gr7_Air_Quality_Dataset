@@ -1,0 +1,4 @@
+method,n,repeated_rows,max_station_deviation_pp,max_season_deviation_pp
+SRSWOR,60291,0,0.154,0.328
+SRSWR,60291,2891,0.215,0.177
+stratified,60291,0,0.002,0.004

@@ -1,0 +1,12 @@
+category,reason (lecture),action,count,imputed?
+Pollutant not measured by the station,attribute not applicable,not_measured,134196,Never
+Before the start / after the end of the series,not collected,outside_period,50819,Never
+Hour missing completely,equipment malfunction / not recorded,missing_row,376695,By gap length (≤ 24h inside the series)
+Invalid / maintenance (Validity −1/−99),deleted by the institution as incorrect,null_invalid,404961,By gap length (≤ 24h inside the series)
+"Sentinel / absurd (all also have Validity −1/−99, so they are counted as null_invalid)",disguised missing value,null_sentinel / null_absurd,0,By gap length (≤ 24h inside the series)
+"NO/NO2 before the analyzer change, November 2019",deleted: inconsistent with other recorded data,null_calibration,98812,By gap length (≤ 24h inside the series); in practice longer → stays null
+Above the physical limit,noise / instrument error,null_physical,0,By gap length (≤ 24h inside the series)
+Large negative,noise / instrument error,null_negative,3112,By gap length (≤ 24h inside the series)
+"Stuck value (non-zero, or zero for PM10, PM2_5, NO2, NOx)",equipment malfunction,null_stuck,3171,By gap length (≤ 24h inside the series)
+Isolated spike,noise,null_spike,473,By gap length (≤ 24h inside the series)
+"PM2.5 > PM10 outside tolerance, inconsistent NOx",deleted: inconsistent with other recorded data,null_inconsistent,53166,By gap length (≤ 24h inside the series); NOx by formula when NO and NO2 are valid
