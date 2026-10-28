@@ -1,4 +1,4 @@
-"""Funksione të përbashkëta: konfigurimi, leximi/shkrimi i Parquet, tabelat, figurat, lineage dhe seksionet e raportit."""
+"""Shared helpers: configuration, Parquet I/O, report tables, figures, lineage and report sections."""
 
 from __future__ import annotations
 
@@ -25,21 +25,18 @@ for folder in (DATA / "bronze", DATA / "silver", DATA / "gold", TABLES, FIGURES,
 
 POLLUTANTS = {int(code): p for code, p in CFG["pollutants"].items()}
 NAMES = [p["name"] for p in POLLUTANTS.values()]
-POLLUTANT_TYPE = pl.Enum(NAMES)          # renditja e ndotësve si në config
-SERIES = ["station_id", "pollutant"]     # një seri = një stacion × një ndotës
-KEY = [*SERIES, "ts_utc"]                # çelësi unik i një matjeje
-SEASONS = {12: "dimër", 1: "dimër", 2: "dimër", 3: "pranverë", 4: "pranverë", 5: "pranverë",
-           6: "verë", 7: "verë", 8: "verë", 9: "vjeshtë", 10: "vjeshtë", 11: "vjeshtë"}
+POLLUTANT_TYPE = pl.Enum(NAMES)
+SERIES = ["station_id", "pollutant"]
+KEY = [*SERIES, "ts_utc"]
+SEASONS = {12: "winter", 1: "winter", 2: "winter", 3: "spring", 4: "spring", 5: "spring",
+           6: "summer", 7: "summer", 8: "summer", 9: "autumn", 10: "autumn", 11: "autumn"}
 
 
 def by_name(field: str, default=None) -> dict[str, float]:
-    """{emri i ndotësit: vlera e fushës} nga config, p.sh. by_name("physical_max")."""
     return {p["name"]: p.get(field, default) for p in POLLUTANTS.values()}
 
 
-# ------------------------------------------------------------------------------------- Parquet
 def write(df: pl.DataFrame, layer: str, name: str, partition_by: str | None = None) -> Path:
-    """Shkruan te data/<layer>/<name>: një skedar, ose dosje e particionuar (p.sh. sipas `pollutant`)."""
     if partition_by:
         path = DATA / layer / name
         shutil.rmtree(path, ignore_errors=True)
@@ -51,55 +48,46 @@ def write(df: pl.DataFrame, layer: str, name: str, partition_by: str | None = No
 
 
 def scan(layer: str, name: str) -> pl.LazyFrame:
-    """Lexim lazy i një tabele (skedar ose dosje e particionuar)."""
     folder = DATA / layer / name
     if folder.is_dir():
         return pl.scan_parquet(folder / "**" / "*.parquet", hive_partitioning=True)
     return pl.scan_parquet(DATA / layer / f"{name}.parquet")
 
 
-# ------------------------------------------------------------------------------------- raportimi
 def _round(decimals: int) -> pl.Expr:
-    """Rrumbullakon kolonat float dhe e kthen -0.0 në 0.0."""
     x = pl.selectors.float().round(decimals)
     return pl.when(x == 0).then(0.0).otherwise(x).name.keep()
 
 
 def table(df: pl.DataFrame, name: str) -> pl.DataFrame:
-    """Ruan tabelën te reports/tables/<name>.csv dhe e kthen (për ta përdorur edhe në raport)."""
-    # 6 shifra dhjetore dhe -0.0 → 0.0: mbledhja paralele e float-eve ndryshon vetëm shifrat e fundit (dhe shenjën
-    # e zeros), kështu CSV-të mbeten identike
     df.with_columns(_round(6)).write_csv(TABLES / f"{name}.csv")
     return df
 
 
 def md(df: pl.DataFrame, max_rows: int = 40) -> str:
-    """DataFrame → tabelë Markdown."""
     df = df.with_columns(_round(3))
     head = "| " + " | ".join(df.columns) + " |\n|" + "---|" * df.width
     rows = "\n".join("| " + " | ".join("" if v is None else str(v).replace("|", "\\|") for v in r) + " |"
-                     for r in df.head(max_rows).iter_rows())   # "|" brenda vlerës do ta prishte tabelën
-    more = f"\n\n*… {df.height - max_rows} rreshta të tjerë te CSV.*" if df.height > max_rows else ""
-    return f"\n\n{head}\n{rows}{more}\n\n"   # rreshta bosh rreth tabelës, që Markdown ta njohë si tabelë
+                     for r in df.head(max_rows).iter_rows())
+    more = f"\n\n*… {df.height - max_rows} more rows in the CSV.*" if df.height > max_rows else ""
+    return f"\n\n{head}\n{rows}{more}\n\n"
 
 
 def write_section(part: str, text: str) -> None:
-    """Seksioni i raportit për një skriptë (run_all.py i bashkon te report_faza1.md)."""
     (SECTIONS / f"{part}.md").write_text(text.strip() + "\n", encoding="utf-8")
 
 
 def lineage(script: str, step: str, rows_before: int, rows_after: int, null_before: int, null_after: int) -> None:
-    """Shton/zëvendëson një rresht te reports/lineage.csv."""
     path = REPORTS / "lineage.csv"
-    row = pl.DataFrame([{"skripta": script, "hapi": step, "rreshta_para": rows_before, "rreshta_pas": rows_after,
-                         "null_para": null_before, "null_pas": null_after}])
+    row = pl.DataFrame([{"script": script, "step": step, "rows_before": rows_before, "rows_after": rows_after,
+                         "nulls_before": null_before, "nulls_after": null_after}])
     if path.exists():
         old = pl.read_csv(path)
-        row = pl.concat([old.filter((pl.col("skripta") != script) | (pl.col("hapi") != step)), row])
-    row.sort("skripta", maintain_order=True).write_csv(path)
+        if old.columns == row.columns:
+            row = pl.concat([old.filter((pl.col("script") != script) | (pl.col("step") != step)), row])
+    row.sort("script", maintain_order=True).write_csv(path)
 
 
-# ------------------------------------------------------------------------------------- figurat
 SURFACE, INK, INK_2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
 COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
 SEQUENTIAL = LinearSegmentedColormap.from_list(
@@ -115,14 +103,12 @@ plt.rcParams.update({
 
 
 def save_figure(fig, name: str) -> str:
-    """Ruan figurën dhe kthen lidhjen Markdown për raportin."""
     fig.savefig(FIGURES / f"{name}.png", bbox_inches="tight", dpi=150)
     plt.close(fig)
     return f"\n![{name}](../figures/{name}.png)\n"
 
 
 def heatmap(wide: pl.DataFrame, title: str, label: str, annotate: bool = True):
-    """Heatmap nga tabelë e gjerë: kolona e parë = etiketat e rreshtave, të tjerat = vlerat."""
     rows, cols = wide[wide.columns[0]].cast(pl.String).to_list(), wide.columns[1:]
     v = np.array([[np.nan if x is None else x for x in r] for r in wide.select(cols).rows()], dtype=float)
     size = (max(6, 0.9 * len(cols)), max(3, 0.4 * len(rows))) if annotate else (12, max(4, 0.12 * len(rows)))
