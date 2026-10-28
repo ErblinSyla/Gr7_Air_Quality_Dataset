@@ -52,7 +52,7 @@ The method evaluation of section 4.3 measured again with the root mean squared e
 {md(r.rmse)}
 {figs['rmse']}
 The best method is the same with MAE and RMSE in {r.same} of {r.total} pollutant × gap-length cases.{rmse_note} The
-strategy of section 4.4 does not change.
+strategy of section 4.3 does not change.
 
 ### A.3 Kolmogorov–Smirnov test
 The KS statistic is the largest distance between two cumulative distributions (0 = identical).
@@ -74,7 +74,7 @@ useful for later methods that assume roughly normal data; the main pipeline keep
 ### A.5 Mutual information
 Mutual information measures any (also non-linear) dependence between a feature and the target (PM2.5 of the next
 hour), on {CFG['features']['selection_sample']:,} rows of 2019–{FIT_YEAR}. The top 10 features and how many of the
-three lecture methods of section 6.3 selected them (`tables/x_mutual_information.csv`):
+three lecture methods of section 6.2 selected them (`tables/x_mutual_information.csv`):
 {md(r.mi.head(10))}
 The five most informative features are {', '.join(mi_top)}; {mi_agree} of them were also selected by the lecture
 methods, so both approaches point to the same information: recent PM levels.

@@ -51,7 +51,7 @@ The method evaluation of section 4.3 measured again with the root mean squared e
 ![x_rmse_by_gap](../figures/x_rmse_by_gap.png)
 
 The best method is the same with MAE and RMSE in 37 of 40 pollutant × gap-length cases. Only for 24h gaps does the class mean have a slightly smaller RMSE (16.37 vs 16.80): RMSE punishes the few large errors of interpolation over a full day more than MAE does. The
-strategy of section 4.4 does not change.
+strategy of section 4.3 does not change.
 
 ### A.3 Kolmogorov–Smirnov test
 The KS statistic is the largest distance between two cumulative distributions (0 = identical).
@@ -118,7 +118,7 @@ useful for later methods that assume roughly normal data; the main pipeline keep
 ### A.5 Mutual information
 Mutual information measures any (also non-linear) dependence between a feature and the target (PM2.5 of the next
 hour), on 50,000 rows of 2019–2023. The top 10 features and how many of the
-three lecture methods of section 6.3 selected them (`tables/x_mutual_information.csv`):
+three lecture methods of section 6.2 selected them (`tables/x_mutual_information.csv`):
 
 
 | feature | mutual_information | selected_by |

@@ -162,4 +162,13 @@ Loadings:
 - **{p.n_90} components** are enough for {int(R['pca_variance'] * 100)}% of the variance, out of 7 pollutants.
 
 Output: `data/gold/features_hourly.parquet` ({r.f.height:,} rows × {r.f.width} columns).
+
+### 6.8 Techniques from the lectures that were not used
+Some lecture techniques were considered and deliberately left out, because they are not needed for this data or for the 
+Phase I requirements: **numerosity reduction** by histograms or clustering, **wavelet transforms** and **data compression** 
+(the volume is already reduced by aggregation, sampling and PCA, and Parquet/zstd storage); **noise detection by 
+regression or clustering** (noise is handled by validity rules, spike and stuck-sensor detection and, as a method, 
+smoothing by binning; regression over series with long gaps would add complexity without a better result); and 
+**supervised discretization** (decision tree, ChiMerge), which needs a class label, while Phase I has no classification 
+task. The unsupervised methods and the EAQI concept hierarchy are enough for the discretization requirement.
 """
