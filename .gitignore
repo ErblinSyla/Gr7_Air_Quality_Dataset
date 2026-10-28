@@ -18,3 +18,7 @@ env/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Data (raw EEA files and the generated bronze/silver/gold layers) is not stored in git
+data/*
+!data/.gitkeep
