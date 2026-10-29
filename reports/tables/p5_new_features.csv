@@ -1,0 +1,14 @@
+feature,formula,reason
+"hour, dow, month, year",extracted from local time,"pollution follows daily (traffic), weekly and seasonal rhythms"
+is_weekend,"day of week ≥ 6 (like ""weekend?"" from a timestamp in the lecture)",less traffic at weekends
+"season, is_heating_season",month → season; October–April,wood/coal heating: much higher PM2.5
+"hour_sin, hour_cos, month_sin, month_cos",sin/cos(2π·x/period),hour 23 and hour 0 are neighbours; the numbers 23 and 0 do not show this
+<P>_is_imputed,the hour's value was imputed in p3,transparency: analyses can treat these values differently
+gas_period_2019,the hour falls before the gas analyzer change (November 2019),suspicious CO/SO2 (p2): analyses can exclude this period
+pm25_pm10_ratio,measured PM2.5 / PM10 (when PM10 > 0 and PM2.5 ≤ PM10),attribute construction (like BMI): high = combustion (fine particles); low = dust
+pm_coarse,measured PM10 − PM2.5,"coarse particles (dust, roads)"
+"<P>_lag_1h, <P>_lag_24h","measured value 1h / 24h earlier, within the station",pollution is persistent
+<P>_roll_mean_24h,mean of the previous 24h (without the current hour),recent pollution level
+"station_type, altitude_m",from the metadata (p2),type of source (traffic/industry/background) and altitude
+"pm25_bin_*, pm10_exceed_eu, pm25_exceed_who, one-hot",discretization and binarization (6.4–6.5),classes and 0/1 indicators
+"<P>_minmax, <P>_z, <P>_dec",normalization (6.6),every pollutant on a comparable scale

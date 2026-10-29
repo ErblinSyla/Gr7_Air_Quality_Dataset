@@ -1,8 +1,0 @@
-kolona,vlera_unike,pct_null,verdikti
-data_capture,1,100.0,100% bosh
-agg_type,1,0.0,konstante
-verification,1,0.0,konstante
-fk_observation_log,558,0.0,"identifikues administrativ, pa informacion për ndotjen"
-unit,2,0.0,"e përcaktuar plotësisht nga ndotësi (CO mg/m³, të tjerët µg/m³): e tepërt"
-result_time,6,0.0,"administrative: koha e publikimit, s'lidhet me matjen"
-ts_end,,0.0,e tepërt: End = Start + 1h (përjashtime: 0)

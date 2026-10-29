@@ -1,0 +1,10 @@
+column,reason
+DataCapture,irrelevant: 100% empty
+AggType,"irrelevant: constant (always 'hour'), zero variance"
+Verification,"irrelevant: constant (always 1), zero variance"
+End,redundant: End = Start + 1h (0 exceptions)
+ResultTime,"irrelevant: publication time, unrelated to pollution"
+FkObservationLog,irrelevant: administrative identifier (like a student ID for predicting GPA)
+Unit,redundant after harmonisation (all values in canonical units)
+Samplingpoint,redundant: split into station_id and pollutant
+Validity,redundant: absorbed into clean_action/status (p2–p3)

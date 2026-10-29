@@ -1,13 +1,13 @@
-kolona_raw,tipi_origjinal,kolona_e_re,tipi_i_ri,tipi_statistikor,pershkrimi,pct_bosh,shembull
-Samplingpoint,String,"station_id, pollutant, instrument",Categorical,nominale,ID-ja e pikës: stacioni_ndotësi_instrumenti,0.0,XK0001A
-Pollutant,Int32,pollutant_code,Int16,nominale,kodi EEA i ndotësit,0.0,1
-Start,"Datetime(time_unit='ns', time_zone=None)","ts_utc, ts_local","Datetime(time_unit='ns', time_zone='UTC')",kohore,fillimi i orës (raw: UTC+1 fiks),0.0,2018-12-31 23:00:00+00:00
-End,"Datetime(time_unit='ns', time_zone=None)",ts_end,"Datetime(time_unit='ns', time_zone='UTC')",kohore,fundi i orës,0.0,2019-01-01 00:00:00+00:00
-Value,"Decimal(precision=38, scale=18)",value_raw,Float64,raport,"përqendrimi (zero e vërtetë, raportet kanë kuptim) — njësitë: SO2: µg/m³, PM10: µg/m³, PM2_5: µg/m³, O3: µg/m³, NO2: µg/m³, NOx: µg/m³, CO: mg/m³, NO: µg/m³",0.0,2.49122
-Unit,String,unit,Categorical,nominale,njësia e deklaruar,0.0,ug.m-3
-AggType,String,agg_type,Categorical,nominale,lloji i agregimit,0.0,hour
-Validity,Int32,validity,Int8,nominale (kod),"1 e vlefshme, 2 nën pragun e detektimit, -1 e pavlefshme, -99 mirëmbajtje",0.0,1
-Verification,Int32,verification,Int8,nominale (kod),statusi i verifikimit,0.0,1
-ResultTime,"Datetime(time_unit='ns', time_zone=None)",result_time,"Datetime(time_unit='ns', time_zone=None)",kohore,koha e publikimit të rezultatit,0.0,2020-10-14 10:31:54
-DataCapture,"Decimal(precision=38, scale=18)",data_capture,Float64,raport,përqindja e mbulimit,100.0,–
-FkObservationLog,String,fk_observation_log,String,nominale (identifikues),referencë administrative e EEA,0.0,1383c4dc-cd6f-49cc-89ce-248fc95217d4
+raw_column,raw_type,new_column,new_type,attribute_type,discrete_continuous,description,pct_empty,example
+Samplingpoint,String,"station_id, pollutant, instrument",Categorical,nominal,discrete,sampling point ID: station_pollutant_instrument,0.0,XK0001A
+Pollutant,Int32,pollutant_code,Int16,nominal,discrete,EEA pollutant code,0.0,1
+Start,"Datetime(time_unit='ns', time_zone=None)","ts_utc, ts_local","Datetime(time_unit='ns', time_zone='UTC')",interval,continuous,start of the hour (raw: fixed UTC+1),0.0,2018-12-31 23:00:00+00:00
+End,"Datetime(time_unit='ns', time_zone=None)",ts_end,"Datetime(time_unit='ns', time_zone='UTC')",interval,continuous,end of the hour,0.0,2019-01-01 00:00:00+00:00
+Value,"Decimal(precision=38, scale=18)",value_raw,Float64,ratio,continuous,"concentration (true zero, ratios are meaningful) — units: SO2: µg/m³, PM10: µg/m³, PM2_5: µg/m³, O3: µg/m³, NO2: µg/m³, NOx: µg/m³, CO: mg/m³, NO: µg/m³",0.0,2.49122
+Unit,String,unit,Categorical,nominal,discrete,declared unit,0.0,ug.m-3
+AggType,String,agg_type,Categorical,nominal,discrete,aggregation type,0.0,hour
+Validity,Int32,validity,Int8,nominal (code),discrete,"1 valid, 2 below detection limit, -1 invalid, -99 maintenance",0.0,1
+Verification,Int32,verification,Int8,nominal (code),discrete,verification status,0.0,1
+ResultTime,"Datetime(time_unit='ns', time_zone=None)",result_time,"Datetime(time_unit='ns', time_zone=None)",interval,continuous,publication time of the result,0.0,2020-10-14 10:31:54
+DataCapture,"Decimal(precision=38, scale=18)",data_capture,Float64,ratio,continuous,data capture percentage,100.0,–
+FkObservationLog,String,fk_observation_log,String,nominal (identifier),discrete,EEA administrative reference,0.0,1383c4dc-cd6f-49cc-89ce-248fc95217d4

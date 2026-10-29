@@ -1,9 +1,0 @@
-pollutant,method,RMSE
-SO2,linear,3.757594
-PM10,linear,12.194126
-PM2_5,linear,8.365876
-O3,linear,20.324873
-NO2,linear,11.057805
-NOx,linear,25.507854
-CO,linear,0.26882
-NO,linear,12.333247
