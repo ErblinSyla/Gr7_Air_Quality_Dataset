@@ -1,1 +1,1 @@
-"""Report text of steps p1–p5 (Markdown sections)."""
+"""Report text as Markdown sections (first_phase: preprocessing, second_phase: outlier detection)."""

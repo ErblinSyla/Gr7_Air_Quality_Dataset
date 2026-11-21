@@ -1,0 +1,4 @@
+pair,common,jaccard
+KNN & LOF,55,0.260664
+KNN & K-Means,64,0.316832
+LOF & K-Means,27,0.112971

@@ -11,7 +11,7 @@ from scipy import stats
 from sklearn.feature_selection import mutual_info_regression
 from sklearn.preprocessing import PowerTransformer
 
-from steps.p4_aggregation_sampling import draw, population
+from steps.first_phase.p4_aggregation_sampling import draw, population
 from utils import CFG, NAMES, SERIES, TABLES, scan, table
 
 FIT_YEAR, SEED = CFG["time"]["fit_until_year"], CFG["features"]["seed"]

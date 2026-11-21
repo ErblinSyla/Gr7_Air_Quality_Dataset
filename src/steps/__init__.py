@@ -1,1 +1,1 @@
-"""Data processing steps p1–p5: read, clean, compute and save data and tables."""
+"""Data processing: read, compute and save data and tables (first_phase: preprocessing, second_phase: outlier detection)."""
