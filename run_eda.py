@@ -65,3 +65,20 @@ def main() -> None:
                                for r in df.group_by(col).len().sort(col).iter_rows())
     if categorical:
         pl.DataFrame(categorical).write_csv(tables / "categorical_counts.csv")
+
+    # Pairwise-complete Pearson correlations preserve the available observations
+    # for each pair and record their sample sizes to make missingness visible.
+    corr = np.eye(len(numeric), dtype=float)
+    pairs = []
+    for i, left in enumerate(numeric):
+        for j in range(i + 1, len(numeric)):
+            right = numeric[j]
+            pair = df.select(left, right).drop_nulls()
+            value = pair.select(pl.corr(left, right)).item() if pair.height >= 2 else None
+            corr[i, j] = corr[j, i] = value if value is not None else np.nan
+            pairs.append({"pollutant_a": left, "pollutant_b": right,
+                          "complete_pairs": pair.height, "pearson_r": value})
+    pl.DataFrame({"pollutant": numeric, **{p: corr[:, i].tolist() for i, p in enumerate(numeric)}}).write_csv(
+        tables / "correlation_matrix.csv")
+    pl.DataFrame(pairs).with_columns(pl.col("pearson_r").abs().alias("abs_r")).sort(
+        "abs_r", descending=True).drop("abs_r").write_csv(tables / "correlation_pairs.csv")
