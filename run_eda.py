@@ -56,3 +56,12 @@ def main() -> None:
         })
     summary = pl.DataFrame(summary_rows)
     summary.write_csv(tables / "summary_by_pollutant.csv")
+
+    categorical = []
+    for col in ("station_id", "season"):
+        if col in df.columns:
+            categorical.extend({"variable": col, "category": str(r[0]), "count": r[1],
+                                "share_pct": 100 * r[1] / df.height}
+                               for r in df.group_by(col).len().sort(col).iter_rows())
+    if categorical:
+        pl.DataFrame(categorical).write_csv(tables / "categorical_counts.csv")
