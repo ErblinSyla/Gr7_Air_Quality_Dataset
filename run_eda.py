@@ -95,3 +95,22 @@ def main() -> None:
     fig.tight_layout()
     fig.savefig(figures / "correlation_heatmap.png", dpi=160)
     plt.close(fig)
+
+    # Scatter plots use a deterministic cap for readability; correlations use
+    # all available complete pairs above.
+    scatter_specs = [("PM10", "PM2_5", "Particulate matter: PM10 vs PM2.5"),
+                     ("NO2", "NO", "Nitrogen oxides: NO2 vs NO")]
+    rng = np.random.default_rng(42)
+    for x, y, title in scatter_specs:
+        points = df.select(x, y).drop_nulls()
+        if points.height > 8000:
+            indices = np.sort(rng.choice(points.height, 8000, replace=False))
+            points = points[indices]
+        fig, ax = plt.subplots(figsize=(7, 5))
+        ax.scatter(points[x].to_numpy(), points[y].to_numpy(), s=8, alpha=0.22, rasterized=True)
+        ux = "mg/m³" if x == "CO" else "µg/m³"
+        uy = "mg/m³" if y == "CO" else "µg/m³"
+        ax.set(xlabel=f"{x} ({ux})", ylabel=f"{y} ({uy})", title=title)
+        fig.tight_layout()
+        fig.savefig(figures / f"scatter_{x.lower()}_{y.lower()}.png", dpi=160)
+        plt.close(fig)
