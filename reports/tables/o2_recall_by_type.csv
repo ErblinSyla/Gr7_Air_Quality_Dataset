@@ -1,0 +1,3 @@
+context,method,param,wrong season,wrong station
+station × month + regional level,LOF,50,0.422886,0.176768
+station × month + regional level,robust z,0,0.253731,0.040404

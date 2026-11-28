@@ -1,0 +1,8 @@
+method,f1_variant,f1_param,f1,pr_auc,roc_auc,pr_auc_variant,pr_auc_param,best_pr_auc,same_choice
+KNN,"euclidean, mean",3.0,0.262172,0.239209,0.875337,"euclidean, mean",3.0,0.239209,true
+LOF,-,10.0,0.514357,0.493277,0.929275,-,10.0,0.493277,true
+K-Means,-,10.0,0.149813,0.107308,0.774808,-,10.0,0.107308,true
+Mahalanobis,"classic, log values",0.0,0.322097,0.348133,0.907985,"classic, log values",0.0,0.348133,true
+One-class SVM,nu=0.05,1.0,0.287141,0.261291,0.884054,nu=0.05,1.0,0.261291,true
+Isolation Forest,trees=300,8192.0,0.129838,0.077764,0.820888,trees=300,8192.0,0.077764,true
+z-score,-,0.0,0.097378,0.061626,0.684629,-,0.0,0.061626,true

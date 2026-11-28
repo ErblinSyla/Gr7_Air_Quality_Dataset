@@ -1,5 +1,11 @@
-"""Runs the pipeline: for every step (p1–p5 and appendix x), process the data (steps), draw the figures (figures)
-and write the report section (sections); then builds reports/report_phase1.md. Usage: python run_all.py [p1 ...]"""
+"""Runs the pipeline: for every step, process the data (steps), draw the figures (figures) and write the report
+section (sections); then builds the report of every phase that was run completely.
+
+Phase I  (first_phase):  p1–p5 and appendix x → reports/report_phase1.md
+Phase II (second_phase): anomaly detection – o1 point, o2 contextual, o3 collective (hourly), o4 summary
+                         → reports/report_phase2.md
+
+Usage: python run_all.py [phase1 | phase2 | p1 o1 ...]   (no argument: both phases)"""
 
 from __future__ import annotations
 
@@ -12,17 +18,27 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 import polars as pl  # noqa: E402
 
-from sections import decisions  # noqa: E402
+from sections.first_phase import decisions  # noqa: E402
+from sections.second_phase import summary  # noqa: E402
 from utils import REPORTS, SECTIONS, md, scan, write_section  # noqa: E402
 
-STEPS = {
-    "p1": "p1_collection_types_quality",
-    "p2": "p2_integration_cleaning",
-    "p3": "p3_missing_values",
-    "p4": "p4_aggregation_sampling",
-    "p5": "p5_features_transformation_reduction",
-    "x": "x_beyond_lectures",
+PHASES = {
+    "phase1": {
+        "p1": "first_phase.p1_collection_types_quality",
+        "p2": "first_phase.p2_integration_cleaning",
+        "p3": "first_phase.p3_missing_values",
+        "p4": "first_phase.p4_aggregation_sampling",
+        "p5": "first_phase.p5_features_transformation_reduction",
+        "x": "first_phase.x_beyond_lectures",
+    },
+    "phase2": {
+        "o1": "second_phase.o1_point_anomalies",
+        "o2": "second_phase.o2_contextual_anomalies",
+        "o3": "second_phase.o3_collective_anomalies",
+        "o4": "second_phase.o4_anomaly_summary",
+    },
 }
+STEPS = {name: module for steps in PHASES.values() for name, module in steps.items()}
 APPENDIX = ["x"]
 
 MAP = [
@@ -65,6 +81,7 @@ MAP = [
 
 
 def run_step(name: str) -> float:
+    """Run one step: data (steps) → figures → report section; returns the duration in seconds."""
     module = STEPS[name]
     step = importlib.import_module(f"steps.{module}")
     figures = importlib.import_module(f"figures.{module}")
@@ -79,6 +96,7 @@ def run_step(name: str) -> float:
 
 
 def build_report() -> None:
+    """Build reports/report_phase1.md from the sections p1–p5, the decision log and the appendix."""
     lineage = pl.read_csv(REPORTS / "lineage.csv")
     facts = (scan("bronze", "measurements")
              .select(pl.col("ts_local").min().dt.date().alias("start"), pl.col("ts_local").max().dt.date().alias("end"),
@@ -87,7 +105,7 @@ def build_report() -> None:
                      pl.len().alias("rows"))
              .collect().row(0, named=True))
     read = lambda name: (SECTIONS / f"{name}.md").read_text(encoding="utf-8")  # noqa: E731
-    sections = "\n\n".join(read(name) for name in STEPS if name not in APPENDIX)
+    sections = "\n\n".join(read(name) for name in PHASES["phase1"] if name not in APPENDIX)
     appendix = "\n\n".join(read(name) for name in APPENDIX)
     requirements = pl.DataFrame(MAP, schema=["Requirement", "Lecture methods", "Script", "Outputs / tables", "Figures"],
                                 orient="row")
@@ -120,17 +138,55 @@ it is applied.
     (REPORTS / "report_phase1.md").write_text(report.replace("../figures/", "figures/"), encoding="utf-8")
 
 
+def build_report_phase2() -> None:
+    """Build reports/report_phase2.md from the sections of phase II."""
+    sections = "\n\n".join((SECTIONS / f"{name}.md").read_text(encoding="utf-8") for name in PHASES["phase2"])
+    report = f"""# Phase II report: anomaly detection in the air quality data of Kosovo
+
+**Data set:** the cleaned measurements of phase I (EEA Air Quality, country XK, E1a, CC BY 4.0): station-day means
+(`data/gold/daily.parquet`) and hourly series (`data/gold/hourly_long/`). This phase only **detects** anomalies; no
+value is changed or removed.
+
+**Approach.** An anomaly (outlier) is an object that differs from most other objects. Following the lecture it can be
+caused by a measurement error, by natural variation or by a different mechanism (a real pollution episode), and it has
+one of three structures. Every structure needs its own representation of the data and its own methods:
+
+| Section | Type of anomaly (lecture) | Representation | Methods | Evaluated with injected |
+|---|---|---|---|---|
+| 1 | point | station-day: six daily means | KNN distance, LOF, K-Means, Mahalanobis, one-class SVM (z-score as baseline) | gain error, sensor at zero, PM2.5 > PM10 |
+| 2 | contextual | station-day relative to its station × month | robust z-score and LOF on the context residuals | wrong season, wrong station |
+| 3 | collective | hourly series of every station and pollutant | isolated-spike, stuck-sensor and drift detectors | spikes, frozen runs, drifts |
+| 4 | summary | all flags together | catalogue of all anomalies | – |
+
+The setting is **unsupervised** (no labels), so every method follows the three steps of the lecture – build a profile
+of normal behaviour, measure how far every observation is from it (the anomaly score), flag the largest scores – and
+every parameter is chosen with **known anomalies injected into a copy of the data**, as in the exercises
+(precision, recall, F1).
+
+{summary.render()}
+
+{sections}
+"""
+    (REPORTS / "report_phase2.md").write_text(report.replace("../figures/", "figures/"), encoding="utf-8")
+
+
 def main() -> None:
-    selected = sys.argv[1:] or list(STEPS)
+    """Run the selected steps (or whole phases) and rebuild the report of every completed phase."""
+    args = sys.argv[1:] or list(PHASES)
+    selected = [name for a in args for name in PHASES.get(a, [a])]
     unknown = [s for s in selected if s not in STEPS]
     if unknown:
-        raise SystemExit(f"Unknown step(s): {unknown}. Choose from {list(STEPS)}.")
+        raise SystemExit(f"Unknown step(s): {unknown}. Choose from {list(PHASES)} or {list(STEPS)}.")
     total = sum(run_step(name) for name in selected)
-    if selected == list(STEPS):
-        build_report()
-        print(f"Done: reports/report_phase1.md ({total:.0f} s in total)")
-    else:
-        print(f"Done: {', '.join(selected)} ({total:.0f} s); run all steps to rebuild the full report")
+    builders = {"phase1": (build_report, "reports/report_phase1.md"),
+                "phase2": (build_report_phase2, "reports/report_phase2.md")}
+    built = []
+    for phase, (build, path) in builders.items():
+        if all(name in selected for name in PHASES[phase]):
+            build()
+            built.append(path)
+    print(f"Done: {', '.join(selected)} ({total:.0f} s)" + (f" → {', '.join(built)}" if built else
+          "; run a whole phase to rebuild its report"))
 
 
 if __name__ == "__main__":

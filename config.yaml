@@ -104,3 +104,40 @@ binarization:
 
 chi2:
   alpha: 0.05
+
+# Phase II: outlier detection (KNN distance, LOF, K-Means, Mahalanobis, one-class SVM) on station-day vectors
+# of the daily means.
+outliers:
+  features: ["PM10", "PM2_5", "NO2", "O3", "SO2", "CO"]
+  threshold_percentile: 99            # a score above this percentile is an outlier (top 1%)
+  threshold_percentiles: [90, 95, 97.5, 99, 99.5]
+  injected_share: 0.01                # known anomalies added only to an evaluation copy of the data
+  injected_factor: [2.0, 5.0]         # one pollutant of a real day multiplied by a factor in this range
+  eval_seeds: [42, 7, 2024]           # every setting is evaluated on three different injections
+  knn_k: [3, 5, 10, 15, 20, 30, 50]
+  knn_metrics: ["euclidean", "manhattan"]
+  knn_scores: ["mean", "kth"]          # mean distance to the k neighbours (exercise) or distance to the k-th (lecture)
+  lof_k: [5, 10, 15, 20, 30, 50, 100]
+  kmeans_k: [2, 3, 4, 5, 6, 8, 10]
+  ocsvm_gamma: [0.05, 0.1, 0.5, 1.0, 2.0]
+  ocsvm_nu: [0.01, 0.05]
+  iforest_max_samples: [256, 1024, 4096, 8192]  # Isolation Forest (comparison method, not in the lectures)
+  iforest_trees: [100, 300]
+  sensitivity_shares: [0.005, 0.01, 0.02]  # injected shares for the threshold sensitivity check
+  sensitivity_percentiles: [97, 98, 99, 99.5]
+  lof_limits: [1.5, 2.0]              # common LOF limits for the real-data estimate of the outlier share
+  chi2_alpha: [0.01, 0.001]           # significance levels of the χ² threshold for the Mahalanobis distance
+  contextual_lof_k: [10, 20, 50, 100]      # o2: n_neighbors of LOF on the context residuals
+  spike_share: 0.001                  # o3: share of the hours that get an injected spike
+  spike_factor: [3.0, 6.0]
+  spike_t: [10, 20, 30, 50, 80]        # threshold in robust standard deviations of the hourly changes
+  stuck_runs: 200                     # injected frozen-sensor runs
+  stuck_length: [3, 24]               # hours
+  stuck_min_len: [3, 4, 6, 12]        # minimum run length that is flagged
+  drift_events: 30
+  drift_days: 30
+  drift_factor: 2.0                   # the value doubles over drift_days
+  drift_window: [3, 7, 14]            # days
+  drift_t: [3, 4, 5]
+  drift_baseline_days: 60                    # a reliable outlier is flagged by at least this many of the five methods
+  seed: 42

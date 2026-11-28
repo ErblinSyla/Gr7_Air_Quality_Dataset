@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import numpy as np
 import polars as pl
 
-from steps.p1_collection_types_quality import VALID, add_quality_flags
+from steps.first_phase.p1_collection_types_quality import VALID, add_quality_flags
 from utils import CFG, NAMES, by_name, lineage, scan, table, write
 
 Q = CFG["quality"]

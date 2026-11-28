@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import numpy as np
 import polars as pl
 
-from steps.p5_features_transformation_reduction import PCA_COLS
+from steps.first_phase.p5_features_transformation_reduction import PCA_COLS
 from utils import CFG, COLORS, INK, NAMES, heatmap, plt, save_figure
 
 E, R = CFG["eaqi"], CFG["reduction"]

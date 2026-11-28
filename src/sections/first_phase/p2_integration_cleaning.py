@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import polars as pl
 
-from steps.p2_integration_cleaning import NOX_FACTOR
+from steps.first_phase.p2_integration_cleaning import NOX_FACTOR
 from utils import CFG, md
 
 Q = CFG["quality"]

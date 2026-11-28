@@ -4,10 +4,10 @@ import numpy as np
 import polars as pl
 import pytest
 
-from steps.p2_integration_cleaning import distance_km
-from steps.p3_missing_values import chi2_test
-from steps.p4_aggregation_sampling import zone
-from steps.p5_features_transformation_reduction import decimal_j, minmax, smooth_by_bins, zscore
+from steps.first_phase.p2_integration_cleaning import distance_km
+from steps.first_phase.p3_missing_values import chi2_test
+from steps.first_phase.p4_aggregation_sampling import zone
+from steps.first_phase.p5_features_transformation_reduction import decimal_j, minmax, smooth_by_bins, zscore
 
 
 def test_min_max_normalization():

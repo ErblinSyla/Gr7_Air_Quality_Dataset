@@ -1,0 +1,5 @@
+covariance,alpha,chi2_threshold,expected_pct,flagged_pct
+classic,0.01,16.811894,1.0,5.713855
+classic,0.001,22.457744,0.1,3.882105
+robust (MCD),0.01,16.811894,1.0,28.998945
+robust (MCD),0.001,22.457744,0.1,23.043872
