@@ -24,6 +24,18 @@ The full pipeline runs in about two minutes and writes `reports/report_phase1.md
 Single steps can be re-run with e.g. `.venv/Scripts/python run_all.py p3` (each step reads the output of the previous
 one; the full report is rebuilt only when all steps run).
 
+## Phase II: Exploratory Data Analysis
+After Phase I has produced `data/gold/sample_10pct.parquet`, run:
+
+```powershell
+.\.venv\Scripts\python.exe run_eda.py
+```
+
+This uses p4's 10% stratified hourly sample (one row per station/hour, pollutant columns in wide format). It reads the
+input without changing it and writes summary and pairwise-correlation tables, a report, a correlation heatmap, and
+two pollutant scatter plots under `reports/eda/`. To analyze another compatible Phase I sample, pass
+`--input path\to\sample.parquet`. Output is intentionally separate from the Phase I report and tables.
+
 ## Tests
 ```bash
 .venv/Scripts/python -m pytest -q
