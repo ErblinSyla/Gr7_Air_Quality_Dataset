@@ -11,6 +11,7 @@ from utils import CFG, md
 
 O = CFG["outliers"]
 EVAL_COLS = ["precision", "recall", "f1", "f1_std", "pr_auc", "roc_auc"]
+DUST_PAPER = "https://acp.copernicus.org/articles/22/4047/2022/"  # independent source for the March 2020 dust event
 
 
 def with_k(d: pl.DataFrame, label: str = "k") -> pl.DataFrame:
@@ -63,22 +64,41 @@ def render(r: SimpleNamespace, figs: dict[str, str]) -> str:
                 " does not depend on the chosen threshold. ROC-AUC gives the same picture but squeezes the methods into"
                 f" a narrow range ({roc['roc_auc'][0]:.2f}–{roc['roc_auc'][-1]:.2f}) because of the many normal days,"
                 " which is why PR-AUC is the more useful threshold-free measure here.")
+    forest = b["Isolation Forest"]
+    forest_grid = (r.iforest.pivot(on="variant", index="param", values="f1").sort("param")
+                   .with_columns(pl.col("param").cast(pl.Int64)).rename({"param": "max_samples"}))
+    sens = r.sensitivity
+    sens_auc = sens.pivot(on="injected_pct", index="method", values="pr_auc")
+    sens_p = sens.pivot(on="injected_pct", index="method", values="best_percentile")
+    sens_auc = sens_auc.rename({c: f"PR-AUC at {c}%" for c in sens_auc.columns if c != "method"})
+    sens_p = sens_p.rename({c: f"best percentile at {c}%" for c in sens_p.columns if c != "method"})
+    leaders = sens.sort("pr_auc", descending=True).group_by("injected_pct", maintain_order=True).first()
+    same_leader = leaders["method"].n_unique() == 1
+    lof_moves = sens.filter(pl.col("method") == "LOF").sort("injected_pct")["best_percentile"].to_list()
+    lof15 = r.lof_share.filter(pl.col("lof_above") == 1.5).row(0, named=True)
     top = r.top.head(15).with_columns(pl.col(*FEATURES, "driver_z", "score_lof").round(2))
     skewed = ", ".join(f"{f} {s:.1f}" for f, s in r.skew.items())
     episode = r.episodes.row(0, named=True) if r.episodes.height else None
+    dust = episode is not None and str(episode["date"]).startswith("2020-03-2")
     episode_text = "" if episode is None else (
         f"The largest episode is **{episode['date']}**: {episode['stations']} stations at once, mean PM10 "
         f"{episode['PM10']:.0f} µg/m³ with a PM2.5/PM10 ratio of only {episode['pm25_pm10_ratio']:.2f} "
         f"(median of all station-days: {r.ratio_median:.2f}). Many stations together and a low share of fine "
         "particles is the pattern of transported coarse dust, not of local smoke from heating (which has a high "
-        "ratio); such a day is a real event, not a sensor error.")
+        "ratio); such a day is a real event, not a sensor error." + (
+            " **External check:** the episode is documented in the literature as an exceptional incursion of"
+            " mineral dust from Central Asia (Aralkum desert) over southern Europe on 27–30 March 2020, traced with"
+            f" the Copernicus CAMS dust forecasts ([Tositti et al., 2022, Atmos. Chem. Phys. 22, 4047]({DUST_PAPER}));"
+            " the detection without any labels found exactly these days." if dust else ""))
     return f"""
 ## 1. Point anomalies
 
 A **point anomaly** is a single observation that differs from the rest of the data (lecture: o₁, o₂ in the figure of
 N₁ and N₂). Here an observation is one **station-day**, and it is anomalous when its combination of pollutant levels is
 unusual. One method from each of the four families of the lecture, plus the one-class SVM, is applied with the same
-threshold rule (a point is an outlier when its score is above the {p:g}th percentile of the scores):
+threshold rule (a point is an outlier when its score is above the {p:g}th percentile of the scores). Isolation
+Forest, the most widely used method in practice, and the univariate z-score are evaluated as comparisons, but they do
+not take part in the final decision:
 
 | Method | Family | Score of a point | Parameters analysed |
 |---|---|---|---|
@@ -87,6 +107,7 @@ threshold rule (a point is an outlier when its score is above the {p:g}th percen
 | K-Means | clustering-based | distance to the nearest centroid | K, elbow |
 | Mahalanobis distance | statistical (multivariate Gaussian) | (x − x̄) S⁻¹ (x − x̄)ᵀ | classic vs robust covariance, log values, χ² threshold |
 | One-class SVM | boundary around the normal data | distance outside the learned boundary | gamma, nu |
+| Isolation Forest (comparison) | isolation by random trees (not in the lectures) | how few random splits isolate the point | max_samples, n_estimators |
 | z-score (baseline) | statistical (univariate) | largest \\|z\\| of the day over the pollutants | – |
 
 ### 1.1 Feature space
@@ -209,7 +230,23 @@ few support vectors: most days are then far from all of them, get almost the sam
 sensitive to its parameters. **Choice: gamma = {b["One-class SVM"]["param"]:g}, {b["One-class SVM"]["variant"]}**
 (F1 = {b["One-class SVM"]["f1"]:.3f}).
 
-### 1.8 Lecture methods that are not used
+### 1.8 Isolation Forest (comparison method, not in the lectures)
+Isolation Forest is the most common anomaly detector in practice. Many random trees split the data at random values of
+random pollutants; a point that is isolated after few splits is different from the rest. **max_samples** is the number
+of days every tree sees, **n_estimators** the number of trees. F1 for every combination (all measures in
+`tables/o1_iforest_evaluation.csv`):
+{md(forest_grid)}
+The number of trees hardly matters; more samples per tree help, because the trees then see more of the structure of
+the data. Even the best setting ({forest["variant"]}, max_samples = {forest["param"]:.0f}) reaches only F1 =
+{forest["f1"]:.3f} and PR-AUC = {forest["pr_auc"]:.3f}, far below LOF ({b["LOF"]["f1"]:.3f} / {b["LOF"]["pr_auc"]:.3f})
+and close to the univariate z-score ({b[BASELINE]["f1"]:.3f}). The reason is how it splits: every split uses one
+pollutant at a time, so a day is isolated quickly only when one value is extreme. The injected anomalies are
+*combinations* of normal values (a zero, an impossible PM2.5/PM10 ratio), which random one-pollutant splits do not
+separate. On the real data its outliers overlap little with those of LOF (Jaccard {r.iforest_lof_jaccard:.2f}). The
+most popular method is therefore not the best one for this data, which is why every method was evaluated rather than
+chosen by reputation.
+
+### 1.9 Lecture methods that are not used
 | Method | Why it is not used for this data |
 |---|---|
 | Grubbs' test | univariate and assumes a normal distribution, but the daily means are right-skewed; it is made for a few suspects in a small sample (one outlier at a time). For N = {r.n_days:,} the critical value is G = {r.grubbs_crit:.2f}, i.e. just a fixed \\|z\\| limit; {r.n_above_grubbs} days have a pollutant above it. This is the z-score baseline with another threshold. |
@@ -217,7 +254,7 @@ sensitive to its parameters. **Choice: gamma = {b["One-class SVM"]["param"]:g}, 
 | Density in a fixed radius (DBSCAN) | one radius for all points; the lecture notes that it works poorly with variable density, and LOF (1.4) is its relative version |
 | Removing objects / discarding small clusters | needs thresholds for "small" and "far" and repeated clustering; the clustering family is represented by the K-Means distance (1.5) |
 
-### 1.9 Choice of the threshold
+### 1.10 Choice of the threshold
 The exercises use the 95th percentile (5% outliers). For the best setting of every method:
 {md(r.threshold)}
 {figs["threshold"]}
@@ -228,7 +265,22 @@ where precision and recall are balanced (LOF: {th99["precision"]:.2f} / {th99["r
 can still be checked one by one. The 95th percentile of the exercise would mark about {round(r.n_days * 0.05)} days,
 most of them ordinary winter days.
 
-### 1.10 Comparison and final decision
+**Is the 99th percentile only chosen because 1% was injected?** Two checks separate the method choice from the
+threshold. (1) The evaluation is repeated with {", ".join(f"{100 * x:g}%" for x in O["sensitivity_shares"])} injected
+anomalies:
+{md(sens_auc)}
+{md(sens_p)}
+The ranking of the methods {"does not change: LOF is the best method for every share" if same_leader else
+"changes with the share"}, while the percentile with the highest F1 follows the injected share (LOF:
+{" → ".join(f"{x:g}" for x in lof_moves)}). So the *method* is independent of the injection, and the *threshold*
+cannot be learned from injected data – it has to be decided from the real data. (2) An estimate from the real data
+alone: the common LOF limit 1.5 (LOF ≈ 1 means as dense as the neighbours) is exceeded by {lof15["days"]} station-days
+({lof15["pct"]:.2f}%):
+{md(r.lof_share)}
+The real data therefore contains about 0.5–1% clear outliers. The 99th percentile (LOF ≥ {r.lof_cut:.2f}) agrees with
+this and is slightly inclusive, which suits a screening step whose alarms are checked afterwards.
+
+### 1.11 Comparison and final decision
 Best setting of every method at the {p:g}th percentile:
 {md(r.best.select("method", "variant", pl.col("param").alias("parameter"), *EVAL_COLS))}
 Recall of every method by type of injected anomaly and by changed pollutant (gain error and sensor at zero):
@@ -264,9 +316,10 @@ lower precision ({union["precision"]:.2f}).
   every station has its own level, and it is stable between the injections.
 - If finding as many faults as possible matters more than false alarms (e.g. a data-quality check before an
   analysis), **LOF or Mahalanobis** is the better rule, because Mahalanobis adds the zero readings.
-- K-Means and the univariate z-score are the weakest and are not needed for the decision.
+- K-Means and the univariate z-score are the weakest and are not needed for the decision; the comparison method
+  Isolation Forest is also clearly weaker than LOF (1.8).
 
-### 1.11 Point anomalies in the real data
+### 1.12 Point anomalies in the real data
 The five methods run with their chosen settings on the {r.n_days:,} real station-days (no injected points):
 {figs["pca"]}
 Number of methods that flag the same day, and the overlap of every pair of methods:

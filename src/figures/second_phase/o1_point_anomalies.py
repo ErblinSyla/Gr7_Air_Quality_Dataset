@@ -6,12 +6,12 @@ from types import SimpleNamespace
 
 import polars as pl
 
-from steps.second_phase.o1_point_anomalies import BASELINE, METHODS, name
+from steps.second_phase.o1_point_anomalies import ALL, BASELINE, METHODS, name
 from utils import CFG, COLORS, GRID, INK_2, plt, save_figure
 
 O = CFG["outliers"]
 COLOR = {"KNN": COLORS[0], "LOF": COLORS[1], "K-Means": COLORS[2], "Mahalanobis": COLORS[3],
-         "One-class SVM": COLORS[6], BASELINE: INK_2}
+         "One-class SVM": COLORS[6], "Isolation Forest": COLORS[5], BASELINE: INK_2}
 OUTLIER = COLORS[7]
 
 
@@ -85,7 +85,7 @@ def threshold(th: pl.DataFrame) -> str:
     """Precision, recall and F1 of the best setting of every method for every threshold percentile."""
     fig, axes = plt.subplots(1, 3, figsize=(13, 3.8), sharey=True)
     for ax, measure in zip(axes, ["precision", "recall", "f1"], strict=True):
-        for method in [*METHODS, BASELINE]:
+        for method in ALL:
             d = th.filter(pl.col("method") == method).sort("percentile")
             ax.plot(d["percentile"], d[measure], marker="o", ms=5, lw=2, color=COLOR[method], label=method)
         ax.axvline(O["threshold_percentile"], color=INK_2, ls="--", lw=0.8)

@@ -10,7 +10,7 @@ from utils import CFG, DATA, REPORTS, TABLES, scan
 pytestmark = pytest.mark.skipif(not (DATA / "gold" / "anomaly_catalogue.parquet").exists(),
                                 reason="phase II outputs not found: run `python run_all.py phase2` first")
 O = CFG["outliers"]
-METHODS = ["knn", "lof", "kmeans", "mahalanobis", "ocsvm"]
+METHODS = ["knn", "lof", "kmeans", "mahalanobis", "ocsvm", "iforest"]
 TOP_SHARE = 1 - O["threshold_percentile"] / 100
 
 
@@ -53,12 +53,15 @@ def test_every_parameter_value_is_evaluated():
     assert pl.read_csv(TABLES / "o1_mahalanobis_evaluation.csv").height == 3
     assert set(pl.read_csv(TABLES / "o1_recall_by_type.csv")["type"]) == {"gain error", "sensor at zero",
                                                                          "PM2.5 > PM10"}
-    assert pl.read_csv(TABLES / "o2_evaluation.csv").height == 4 * (1 + len(O["contextual_lof_k"]))
+    assert pl.read_csv(TABLES / "o2_evaluation.csv").height == 6 * (1 + len(O["contextual_lof_k"]))
+    assert sorted(set(pl.read_csv(TABLES / "o1_iforest_evaluation.csv")["param"])) == sorted(O["iforest_max_samples"])
+    sens = pl.read_csv(TABLES / "o1_threshold_sensitivity.csv")
+    assert sorted(set(sens["injected_pct"])) == sorted(100 * x for x in O["sensitivity_shares"])
     assert set(pl.read_csv(TABLES / "o3_best_settings.csv")["fault"]) == {"spike", "stuck sensor", "drift"}
     for name in ("o1_knn_evaluation", "o1_lof_evaluation", "o2_evaluation"):
         ev = pl.read_csv(TABLES / f"{name}.csv")
         assert ev["pr_auc"].is_between(0, 1).all() and ev["roc_auc"].is_between(0, 1).all()
-    assert pl.read_csv(TABLES / "o1_auc_check.csv").height == 6
+    assert pl.read_csv(TABLES / "o1_auc_check.csv").height == 7  # 5 lecture methods, Isolation Forest, z-score
 
 
 def test_contextual_flags():
@@ -91,7 +94,8 @@ def test_report_phase2():
     figures = re.findall(r"\(figures/([^)]+)\)", report)
     assert len(figures) == 12 and all((REPORTS / "figures" / f).exists() for f in figures)
     assert "{" not in report and "}" not in report and " None " not in report
-    for title in ("## 1. Point anomalies", "## 2. Contextual anomalies", "## 3. Collective anomalies",
+    for title in ("## Summary", "Isolation Forest (comparison method", "Is the 99th percentile only chosen",
+                  "Tositti et al.", "Regional level (weather proxy)", "## 1. Point anomalies", "## 2. Contextual anomalies", "## 3. Collective anomalies",
                   "## 4. Summary", "Lecture methods that are not used", "Comparison and final decision",
                   "Check against the rules of phase I"):
         assert title in report

@@ -36,7 +36,7 @@ The types overlap little: each representation finds its own anomalies, which is 
 {figs["stations"]}
 {md(r.by_year)}
 Point anomalies are most frequent in {peak_year["year"]} ({peak_year["point"]} station-days, among them the dust
-episode of March 2020 and the SO2 episode in Mitrovica in May 2020, section 1.11). The stuck-sensor alarms
+episode of March 2020 and the SO2 episode in Mitrovica in May 2020, section 1.12). The stuck-sensor alarms
 are concentrated at Brezovica (XK0007A, NO2 at zero) and Palaj (XK0010A), which shows that a few instruments cause
 most of the technical faults.
 
@@ -47,7 +47,9 @@ most of the technical faults.
 | Every choice evaluated with injected anomalies of its type ({len(O["eval_seeds"])} seeds) | the real data has no labels; injection gives precision, recall and F1 |
 | Point anomalies: LOF, threshold {O["threshold_percentile"]:g}th percentile; Mahalanobis as an optional addition | best F1 of all methods and combination rules; Mahalanobis adds the zero readings |
 | Majority voting is not used | the weaker methods outvote LOF (lower F1) |
-| Contextual anomalies: LOF on residuals of the station × month profile | without context the F1 is ≈ 0 |
+| Isolation Forest only as a comparison | not in the lectures and clearly weaker than LOF on this data |
+| Threshold: 99th percentile | the method ranking does not depend on the injected share; the real data has ≈ 0.5–1% clear outliers (LOF > 1.5) |
+| Contextual anomalies: LOF on the residuals of the station × month profile after removing the regional level of the day | without context the F1 is ≈ 0; the regional level (weather proxy) gives the best context |
 | Temporal anomalies: isolated-spike and stuck-sensor detectors; drift not flagged | drift cannot be separated from natural differences without a reference instrument |
 | Static thresholds (\\|z\\| > 3, χ², Grubbs) are not used | the data is not Gaussian; the χ² threshold marks several times the expected share |
 | Anomalies are flagged, not removed | many are real events (dust, smog, local emissions); removal needs the reason for every anomaly |

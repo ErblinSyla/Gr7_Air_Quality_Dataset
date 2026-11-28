@@ -1,11 +1,13 @@
 types,station_days
-spike,1852
-stuck sensor,153
-contextual,107
-point,92
-point + spike,19
-point + contextual,16
-contextual + spike,7
-spike + stuck sensor,4
-point + stuck sensor,3
-point + contextual + spike,3
+spike,1853
+stuck sensor,152
+contextual,111
+point,98
+point + spike,21
+point + contextual,10
+contextual + spike,6
+spike + stuck sensor,3
+point + contextual + stuck sensor,3
+point + contextual + spike,1
+contextual + spike + stuck sensor,1
+contextual + stuck sensor,1

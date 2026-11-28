@@ -23,7 +23,7 @@ python -m venv .venv
 .venv/Scripts/python -m pip install -r requirements.txt   # Linux/macOS: .venv/bin/python
 .venv/Scripts/python run_all.py
 ```
-The full pipeline runs in about seven minutes and writes `reports/report_phase1.md` and `reports/report_phase2.md`.
+The full pipeline runs in about ten minutes and writes `reports/report_phase1.md` and `reports/report_phase2.md`.
 One phase can be run with `.venv/Scripts/python run_all.py phase1` or `... phase2` (phase II reads the daily means of
 phase I, so phase I must have run once). Single steps can be re-run with e.g. `.venv/Scripts/python run_all.py p3`
 (each step reads the output of the previous one; the report of a phase is rebuilt only when all its steps run).
@@ -58,10 +58,10 @@ Every step has three modules with the same name, one per responsibility; each fo
 | I | `p5_features_transformation_reduction` | feature subset selection, feature creation, discretization and binarization, transformation, dimensionality reduction |
 | I | `x_beyond_lectures` | appendix (optional, beyond the lectures): MCAR check, RMSE, Kolmogorov–Smirnov, Yeo-Johnson, mutual information |
 | II | `common` | shared parts of phase II: station-day feature space, scaling, percentile threshold, robust z-score, precision / recall / F1, PR-AUC / ROC-AUC |
-| II | `o1_point_anomalies` | point anomalies of the station-days: KNN distance (k, Euclidean vs Manhattan, mean vs k-th), LOF (n_neighbors), K-Means (K, elbow), Mahalanobis (classic vs robust covariance, log values, χ² threshold), one-class SVM (gamma, nu), threshold, combination rules; evaluated with injected gain errors, zero readings and PM2.5 > PM10 |
-| II | `o2_contextual_anomalies` | contextual anomalies: robust z-score and LOF on the residuals of the station × month profile; context granularity; evaluated with injected wrong-season and wrong-station days |
+| II | `o1_point_anomalies` | point anomalies of the station-days: KNN distance (k, Euclidean vs Manhattan, mean vs k-th), LOF (n_neighbors), K-Means (K, elbow), Mahalanobis (classic vs robust covariance, log values, χ² threshold), one-class SVM (gamma, nu), Isolation Forest as comparison (max_samples, trees), threshold incl. sensitivity to the injected share, combination rules; evaluated with injected gain errors, zero readings and PM2.5 > PM10 |
+| II | `o2_contextual_anomalies` | contextual anomalies: robust z-score and LOF on the residuals of the context profile; contexts from station to station × month × day type and the regional level of the day (weather proxy); evaluated with injected wrong-season and wrong-station days |
 | II | `o3_collective_anomalies` | collective anomalies of the hourly series: isolated spike (threshold), stuck sensor (run length), drift (window, threshold); evaluated with injected faults and checked against the phase I rules |
-| II | `o4_anomaly_summary` | catalogue of all anomalies, overlap of the types, where and when they occur |
+| II | `o4_anomaly_summary` | catalogue of all anomalies, overlap of the types, where and when they occur; `sections/second_phase/summary.py` writes the 1–2 page summary at the start of the report |
 
 Other files: `src/utils.py` (shared helpers), `run_all.py` (runs steps → figures → sections and builds the report),
 `config.yaml` (all paths and parameters).

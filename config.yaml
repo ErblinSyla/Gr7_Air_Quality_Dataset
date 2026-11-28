@@ -121,8 +121,13 @@ outliers:
   kmeans_k: [2, 3, 4, 5, 6, 8, 10]
   ocsvm_gamma: [0.05, 0.1, 0.5, 1.0, 2.0]
   ocsvm_nu: [0.01, 0.05]
+  iforest_max_samples: [256, 1024, 4096, 8192]  # Isolation Forest (comparison method, not in the lectures)
+  iforest_trees: [100, 300]
+  sensitivity_shares: [0.005, 0.01, 0.02]  # injected shares for the threshold sensitivity check
+  sensitivity_percentiles: [97, 98, 99, 99.5]
+  lof_limits: [1.5, 2.0]              # common LOF limits for the real-data estimate of the outlier share
   chi2_alpha: [0.01, 0.001]           # significance levels of the χ² threshold for the Mahalanobis distance
-  contextual_lof_k: [10, 20, 50]      # o2: n_neighbors of LOF on the context residuals
+  contextual_lof_k: [10, 20, 50, 100]      # o2: n_neighbors of LOF on the context residuals
   spike_share: 0.001                  # o3: share of the hours that get an injected spike
   spike_factor: [3.0, 6.0]
   spike_t: [10, 20, 30, 50, 80]        # threshold in robust standard deviations of the hourly changes

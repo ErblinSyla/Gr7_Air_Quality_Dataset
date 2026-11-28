@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 import polars as pl  # noqa: E402
 
 from sections.first_phase import decisions  # noqa: E402
+from sections.second_phase import summary  # noqa: E402
 from utils import REPORTS, SECTIONS, md, scan, write_section  # noqa: E402
 
 PHASES = {
@@ -161,6 +162,8 @@ The setting is **unsupervised** (no labels), so every method follows the three s
 of normal behaviour, measure how far every observation is from it (the anomaly score), flag the largest scores – and
 every parameter is chosen with **known anomalies injected into a copy of the data**, as in the exercises
 (precision, recall, F1).
+
+{summary.render()}
 
 {sections}
 """

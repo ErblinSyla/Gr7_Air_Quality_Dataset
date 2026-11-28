@@ -20,12 +20,68 @@ of normal behaviour, measure how far every observation is from it (the anomaly s
 every parameter is chosen with **known anomalies injected into a copy of the data**, as in the exercises
 (precision, recall, F1).
 
+
+## Summary
+
+**Goal and data.** Detect – not remove – anomalies in the cleaned air-quality measurements of Kosovo (12 stations,
+2019–2024): station-day means for point and contextual anomalies, hourly series for collective anomalies.
+
+**Approach.** The three types of anomalies of the lecture are detected separately, each with the representation of the
+data in which it is visible. Because the data has no labels, every method and parameter was chosen with known anomalies
+injected into a copy of the data (as in the exercises), measured with precision, recall, F1 and the threshold-free
+PR-AUC; the chosen settings were then applied to the real data.
+
+
+| type of anomaly | chosen method | F1 | PR-AUC | found in the real data |
+|---|---|---|---|---|
+| point (station-day) | LOF, n_neighbors = 10 | 0.514 | 0.493 | 133 station-days |
+| contextual (station, month, weather) | LOF on residuals, station × month + regional level | 0.3 | 0.229 | 133 station-days |
+| collective: isolated spike | spike detector, t = 30 | 0.31 |  | 2,303 hours |
+| collective: stuck sensor | run length, L = 4 h | 0.786 |  | 1,093 hours |
+| collective: drift | shift against the other stations | 0.03 |  | not detectable (not flagged) |
+
+
+**Key findings**
+1. **LOF is the best point method** (F1 0.51, PR-AUC 0.49; a random score has PR-AUC
+   0.01), ahead of Mahalanobis (0.32), the one-class SVM
+   (0.29), KNN (0.26) and K-Means (0.15). Isolation
+   Forest, the most common method in practice, reaches only 0.13, close to the univariate
+   z-score (0.10): it isolates single extreme values, while the anomalies here are unusual
+   combinations of normal values.
+2. **The methods are complementary, but majority voting is worse.** Mahalanobis finds a sensor reading zero best
+   (recall 0.63 vs LOF 0.44), LOF the impossible
+   PM2.5 > PM10 (0.64); a vote of ≥ 3 of 5 methods drops to F1 0.29
+   because the weaker methods outvote LOF. Final rule: **LOF only**.
+3. **The choice does not depend on the threshold.** The method ranking is the same with
+   0.5%, 1%, 2% injected anomalies (best method:
+   LOF), and the real data alone has 0.5% of days above the usual LOF limit 1.5, so the
+   99th-percentile threshold (top 1%) fits the data.
+4. **Contextual anomalies need context.** Without it the score is random (ROC-AUC 0.50); comparing every
+   day with its station, month and the other stations of the same day (a weather proxy) raises F1 from
+   0.20 (station × month) to 0.30. 57% of the real contextual anomalies are values
+   *below* the expected level – never visible as global outliers, but a typical sign of an analyzer problem. Repeated alarms point to instruments: e.g. 6 days of unusual O3 at XK0011A in 2023-06.
+5. **Temporal faults:** stuck sensors are found reliably – the detector finds
+   100% of the stuck hours that phase I removed with fixed rules – spikes partly
+   (F1 0.31); a slow drift cannot be separated from natural differences without a reference
+   instrument (F1 0.03) and is reported as a limitation.
+6. **The anomalies are both real events and faults.** The strongest regional event, 5 stations on the same day at the end of March 2020 with a low PM2.5/PM10 ratio, is the Central Asian dust incursion documented in the literature ([Tositti et al., 2022](https://acp.copernicus.org/articles/22/4047/2022/)). Other examples: an SO2 episode at one station
+   (Mitrovica, May 2020), single-hour SO2 and NO peaks near industry and traffic, and runs of NO2 = 0 that were created
+   when phase I set small negative readings to zero. That is why nothing is removed: the reason for every anomaly
+   decides whether it is an error or an important pollution episode.
+
+**Limitations.** The injected anomalies are simplified models of real faults; there are no confirmed labels for the
+real data; the data set has no meteorological data (the other stations are used as a proxy); drift needs a reference
+instrument.
+
+
 ## 1. Point anomalies
 
 A **point anomaly** is a single observation that differs from the rest of the data (lecture: o₁, o₂ in the figure of
 N₁ and N₂). Here an observation is one **station-day**, and it is anomalous when its combination of pollutant levels is
 unusual. One method from each of the four families of the lecture, plus the one-class SVM, is applied with the same
-threshold rule (a point is an outlier when its score is above the 99th percentile of the scores):
+threshold rule (a point is an outlier when its score is above the 99th percentile of the scores). Isolation
+Forest, the most widely used method in practice, and the univariate z-score are evaluated as comparisons, but they do
+not take part in the final decision:
 
 | Method | Family | Score of a point | Parameters analysed |
 |---|---|---|---|
@@ -34,6 +90,7 @@ threshold rule (a point is an outlier when its score is above the 99th percentil
 | K-Means | clustering-based | distance to the nearest centroid | K, elbow |
 | Mahalanobis distance | statistical (multivariate Gaussian) | (x − x̄) S⁻¹ (x − x̄)ᵀ | classic vs robust covariance, log values, χ² threshold |
 | One-class SVM | boundary around the normal data | distance outside the learned boundary | gamma, nu |
+| Isolation Forest (comparison) | isolation by random trees (not in the lectures) | how few random splits isolate the point | max_samples, n_estimators |
 | z-score (baseline) | statistical (univariate) | largest \|z\| of the day over the pollutants | – |
 
 ### 1.1 Feature space
@@ -240,7 +297,32 @@ few support vectors: most days are then far from all of them, get almost the sam
 sensitive to its parameters. **Choice: gamma = 1, nu=0.05**
 (F1 = 0.287).
 
-### 1.8 Lecture methods that are not used
+### 1.8 Isolation Forest (comparison method, not in the lectures)
+Isolation Forest is the most common anomaly detector in practice. Many random trees split the data at random values of
+random pollutants; a point that is isolated after few splits is different from the rest. **max_samples** is the number
+of days every tree sees, **n_estimators** the number of trees. F1 for every combination (all measures in
+`tables/o1_iforest_evaluation.csv`):
+
+
+| max_samples | trees=100 | trees=300 |
+|---|---|---|
+| 256 | 0.05 | 0.052 |
+| 1024 | 0.072 | 0.075 |
+| 4096 | 0.112 | 0.11 |
+| 8192 | 0.127 | 0.13 |
+
+
+The number of trees hardly matters; more samples per tree help, because the trees then see more of the structure of
+the data. Even the best setting (trees=300, max_samples = 8192) reaches only F1 =
+0.130 and PR-AUC = 0.078, far below LOF (0.514 / 0.493)
+and close to the univariate z-score (0.097). The reason is how it splits: every split uses one
+pollutant at a time, so a day is isolated quickly only when one value is extreme. The injected anomalies are
+*combinations* of normal values (a zero, an impossible PM2.5/PM10 ratio), which random one-pollutant splits do not
+separate. On the real data its outliers overlap little with those of LOF (Jaccard 0.09). The
+most popular method is therefore not the best one for this data, which is why every method was evaluated rather than
+chosen by reputation.
+
+### 1.9 Lecture methods that are not used
 | Method | Why it is not used for this data |
 |---|---|
 | Grubbs' test | univariate and assumes a normal distribution, but the daily means are right-skewed; it is made for a few suspects in a small sample (one outlier at a time). For N = 13,266 the critical value is G = 4.62, i.e. just a fixed \|z\| limit; 274 days have a pollutant above it. This is the z-score baseline with another threshold. |
@@ -248,7 +330,7 @@ sensitive to its parameters. **Choice: gamma = 1, nu=0.05**
 | Density in a fixed radius (DBSCAN) | one radius for all points; the lecture notes that it works poorly with variable density, and LOF (1.4) is its relative version |
 | Removing objects / discarding small clusters | needs thresholds for "small" and "far" and repeated clustering; the clustering family is represented by the K-Means distance (1.5) |
 
-### 1.9 Choice of the threshold
+### 1.10 Choice of the threshold
 The exercises use the 95th percentile (5% outliers). For the best setting of every method:
 
 
@@ -279,6 +361,11 @@ The exercises use the 95th percentile (5% outliers). For the best setting of eve
 | One-class SVM | 97.5 | 0.163 | 0.411 | 0.234 |
 | One-class SVM | 99.0 | 0.286 | 0.288 | 0.287 |
 | One-class SVM | 99.5 | 0.418 | 0.211 | 0.28 |
+| Isolation Forest | 90.0 | 0.044 | 0.441 | 0.08 |
+| Isolation Forest | 95.0 | 0.054 | 0.273 | 0.09 |
+| Isolation Forest | 97.5 | 0.069 | 0.173 | 0.098 |
+| Isolation Forest | 99.0 | 0.129 | 0.13 | 0.13 |
+| Isolation Forest | 99.5 | 0.189 | 0.095 | 0.127 |
 | z-score | 90.0 | 0.027 | 0.273 | 0.049 |
 | z-score | 95.0 | 0.042 | 0.211 | 0.07 |
 | z-score | 97.5 | 0.062 | 0.155 | 0.088 |
@@ -296,7 +383,52 @@ where precision and recall are balanced (LOF: 0.51 / 0.52) and the number of day
 can still be checked one by one. The 95th percentile of the exercise would mark about 663 days,
 most of them ordinary winter days.
 
-### 1.10 Comparison and final decision
+**Is the 99th percentile only chosen because 1% was injected?** Two checks separate the method choice from the
+threshold. (1) The evaluation is repeated with 0.5%, 1%, 2% injected
+anomalies:
+
+
+| method | PR-AUC at 0.5% | PR-AUC at 1.0% | PR-AUC at 2.0% |
+|---|---|---|---|
+| KNN | 0.212 | 0.203 | 0.251 |
+| LOF | 0.505 | 0.48 | 0.522 |
+| K-Means | 0.08 | 0.098 | 0.117 |
+| Mahalanobis | 0.354 | 0.348 | 0.41 |
+| One-class SVM | 0.245 | 0.225 | 0.262 |
+| Isolation Forest | 0.034 | 0.071 | 0.081 |
+| z-score | 0.067 | 0.059 | 0.074 |
+
+
+
+
+| method | best percentile at 0.5% | best percentile at 1.0% | best percentile at 2.0% |
+|---|---|---|---|
+| KNN | 99.5 | 99.0 | 99.0 |
+| LOF | 99.5 | 99.0 | 98.0 |
+| K-Means | 99.0 | 99.0 | 99.0 |
+| Mahalanobis | 99.5 | 99.5 | 99.0 |
+| One-class SVM | 99.5 | 99.0 | 99.0 |
+| Isolation Forest | 99.5 | 99.5 | 97.0 |
+| z-score | 99.5 | 99.0 | 97.0 |
+
+
+The ranking of the methods does not change: LOF is the best method for every share, while the percentile with the highest F1 follows the injected share (LOF:
+99.5 → 99 → 98). So the *method* is independent of the injection, and the *threshold*
+cannot be learned from injected data – it has to be decided from the real data. (2) An estimate from the real data
+alone: the common LOF limit 1.5 (LOF ≈ 1 means as dense as the neighbours) is exceeded by 68 station-days
+(0.51%):
+
+
+| lof_above | days | pct |
+|---|---|---|
+| 1.5 | 68 | 0.513 |
+| 2.0 | 2 | 0.015 |
+
+
+The real data therefore contains about 0.5–1% clear outliers. The 99th percentile (LOF ≥ 1.40) agrees with
+this and is slightly inclusive, which suits a screening step whose alarms are checked afterwards.
+
+### 1.11 Comparison and final decision
 Best setting of every method at the 99th percentile:
 
 
@@ -307,29 +439,30 @@ Best setting of every method at the 99th percentile:
 | K-Means | - | 10.0 | 0.149 | 0.15 | 0.15 | 0.027 | 0.107 | 0.775 |
 | Mahalanobis | classic, log values | 0.0 | 0.321 | 0.323 | 0.322 | 0.007 | 0.348 | 0.908 |
 | One-class SVM | nu=0.05 | 1.0 | 0.286 | 0.288 | 0.287 | 0.019 | 0.261 | 0.884 |
+| Isolation Forest | trees=300 | 8192.0 | 0.129 | 0.13 | 0.13 | 0.035 | 0.078 | 0.821 |
 | z-score | - | 0.0 | 0.097 | 0.098 | 0.097 | 0.007 | 0.062 | 0.685 |
 
 
 Recall of every method by type of injected anomaly and by changed pollutant (gain error and sensor at zero):
 
 
-| type | KNN | LOF | K-Means | Mahalanobis | One-class SVM | z-score |
-|---|---|---|---|---|---|---|
-| PM2.5 > PM10 | 0.242 | 0.644 | 0.114 | 0.053 | 0.265 | 0.068 |
-| gain error | 0.385 | 0.467 | 0.281 | 0.289 | 0.415 | 0.215 |
-| sensor at zero | 0.159 | 0.439 | 0.053 | 0.629 | 0.182 | 0.008 |
+| type | KNN | LOF | K-Means | Mahalanobis | One-class SVM | Isolation Forest | z-score |
+|---|---|---|---|---|---|---|---|
+| PM2.5 > PM10 | 0.242 | 0.644 | 0.114 | 0.053 | 0.265 | 0.091 | 0.068 |
+| gain error | 0.385 | 0.467 | 0.281 | 0.289 | 0.415 | 0.252 | 0.215 |
+| sensor at zero | 0.159 | 0.439 | 0.053 | 0.629 | 0.182 | 0.045 | 0.008 |
 
 
 
 
-| pollutant | KNN | LOF | K-Means | Mahalanobis | One-class SVM | z-score |
-|---|---|---|---|---|---|---|
-| CO | 0.109 | 0.174 | 0.065 | 0.043 | 0.13 | 0.043 |
-| NO2 | 0.256 | 0.385 | 0.205 | 0.513 | 0.282 | 0.154 |
-| O3 | 0.31 | 0.405 | 0.262 | 0.476 | 0.333 | 0.19 |
-| PM10 | 0.404 | 0.75 | 0.25 | 0.885 | 0.442 | 0.135 |
-| PM2_5 | 0.4 | 0.756 | 0.178 | 0.711 | 0.444 | 0.133 |
-| SO2 | 0.14 | 0.186 | 0.047 | 0.047 | 0.14 | 0.023 |
+| pollutant | KNN | LOF | K-Means | Mahalanobis | One-class SVM | Isolation Forest | z-score |
+|---|---|---|---|---|---|---|---|
+| CO | 0.109 | 0.174 | 0.065 | 0.043 | 0.13 | 0.087 | 0.043 |
+| NO2 | 0.256 | 0.385 | 0.205 | 0.513 | 0.282 | 0.128 | 0.154 |
+| O3 | 0.31 | 0.405 | 0.262 | 0.476 | 0.333 | 0.238 | 0.19 |
+| PM10 | 0.404 | 0.75 | 0.25 | 0.885 | 0.442 | 0.212 | 0.135 |
+| PM2_5 | 0.4 | 0.756 | 0.178 | 0.711 | 0.444 | 0.156 | 0.133 |
+| SO2 | 0.14 | 0.186 | 0.047 | 0.047 | 0.14 | 0.07 | 0.023 |
 
 
 The methods see different anomalies. **LOF** finds the impossible PM2.5 > PM10 best (recall
@@ -351,10 +484,11 @@ chosen by F1 is compared with the setting that has the highest PR-AUC:
 | K-Means | - | 10.0 | 0.15 | 0.107 | 0.775 | - | 10.0 | 0.107 | True |
 | Mahalanobis | classic, log values | 0.0 | 0.322 | 0.348 | 0.908 | classic, log values | 0.0 | 0.348 | True |
 | One-class SVM | nu=0.05 | 1.0 | 0.287 | 0.261 | 0.884 | nu=0.05 | 1.0 | 0.261 | True |
+| Isolation Forest | trees=300 | 8192.0 | 0.13 | 0.078 | 0.821 | trees=300 | 8192.0 | 0.078 | True |
 | z-score | - | 0.0 | 0.097 | 0.062 | 0.685 | - | 0.0 | 0.062 | True |
 
 
-PR-AUC chooses **the same setting for every method** and ranks the methods **in the same order** as F1 (LOF > Mahalanobis > One-class SVM > KNN > K-Means > z-score; a random score would get 0.01). The decision therefore does not depend on the chosen threshold. ROC-AUC gives the same picture but squeezes the methods into a narrow range (0.68–0.93) because of the many normal days, which is why PR-AUC is the more useful threshold-free measure here.
+PR-AUC chooses **the same setting for every method** and ranks the methods **in the same order** as F1 (LOF > Mahalanobis > One-class SVM > KNN > K-Means > Isolation Forest > z-score; a random score would get 0.01). The decision therefore does not depend on the chosen threshold. ROC-AUC gives the same picture but squeezes the methods into a narrow range (0.68–0.93) because of the many normal days, which is why PR-AUC is the more useful threshold-free measure here.
 
 **How to combine the methods.** Because the methods are complementary, four combination rules are evaluated on the
 same injections:
@@ -385,15 +519,16 @@ Mahalanobis finds the most anomalies (recall 0.62, sensor at zero
 lower precision (0.36).
 
 **Final decision.** Ranking of the single methods by F1:
-LOF 0.514, Mahalanobis 0.322, One-class SVM 0.287, KNN 0.262, K-Means 0.150, z-score 0.097.
+LOF 0.514, Mahalanobis 0.322, One-class SVM 0.287, KNN 0.262, K-Means 0.150, Isolation Forest 0.130, z-score 0.097.
 - **Point anomaly = LOF only** (highest F1 of all rules: 0.514): LOF is the best method for
   2 of the 3 types (gain error, PM2.5 > PM10), its relative density fits data in which
   every station has its own level, and it is stable between the injections.
 - If finding as many faults as possible matters more than false alarms (e.g. a data-quality check before an
   analysis), **LOF or Mahalanobis** is the better rule, because Mahalanobis adds the zero readings.
-- K-Means and the univariate z-score are the weakest and are not needed for the decision.
+- K-Means and the univariate z-score are the weakest and are not needed for the decision; the comparison method
+  Isolation Forest is also clearly weaker than LOF (1.8).
 
-### 1.11 Point anomalies in the real data
+### 1.12 Point anomalies in the real data
 The five methods run with their chosen settings on the 13,266 real station-days (no injected points):
 
 ![o1_detected_pca](figures/o1_detected_pca.png)
@@ -470,18 +605,18 @@ Dates on which the point anomalies appear at several stations at once:
 | 2020-03-28 | 5 | 112.026 | 58.161 | 0.526 | PM10 |
 | 2020-05-15 | 5 | 79.341 | 19.504 | 0.249 | PM10 |
 | 2020-03-27 | 4 | 122.156 | 58.113 | 0.475 | PM10 |
-| 2020-03-20 | 3 | 56.239 | 41.104 | 0.734 | PM10 |
+| 2020-03-20 | 3 | 56.239 | 41.104 | 0.734 | O3 |
 | 2020-03-29 | 3 | 79.347 | 45.858 | 0.57 | PM10 |
 | 2021-02-17 | 3 | 80.528 | 75.41 | 0.926 | PM2_5 |
 | 2021-08-17 | 3 | 31.563 | 17.584 | 0.563 | O3 |
 | 2020-04-10 | 2 | 43.348 | 28.575 | 0.656 | O3 |
-| 2021-06-26 | 2 | 25.21 | 8.792 | 0.349 | O3 |
-| 2021-09-18 | 2 | 7.824 | 5.319 | 0.756 | NO2 |
+| 2021-06-26 | 2 | 25.21 | 8.792 | 0.349 | NO2 |
+| 2021-09-18 | 2 | 7.824 | 5.319 | 0.756 | SO2 |
 
 *… 2 more rows in the CSV.*
 
 
-The largest episode is **2020-03-28**: 5 stations at once, mean PM10 112 µg/m³ with a PM2.5/PM10 ratio of only 0.53 (median of all station-days: 0.72). Many stations together and a low share of fine particles is the pattern of transported coarse dust, not of local smoke from heating (which has a high ratio); such a day is a real event, not a sensor error.
+The largest episode is **2020-03-28**: 5 stations at once, mean PM10 112 µg/m³ with a PM2.5/PM10 ratio of only 0.53 (median of all station-days: 0.72). Many stations together and a low share of fine particles is the pattern of transported coarse dust, not of local smoke from heating (which has a high ratio); such a day is a real event, not a sensor error. **External check:** the episode is documented in the literature as an exceptional incursion of mineral dust from Central Asia (Aralkum desert) over southern Europe on 27–30 March 2020, traced with the Copernicus CAMS dust forecasts ([Tositti et al., 2022, Atmos. Chem. Phys. 22, 4047](https://acp.copernicus.org/articles/22/4047/2022/)); the detection without any labels found exactly these days.
 
 The strongest point anomalies (most methods first, then by LOF; all in `tables/o1_top_outliers.csv`):
 
@@ -515,10 +650,11 @@ need a check of the instrument. This is why the anomalies are only flagged and n
 
 A **contextual anomaly** is a value that is anomalous only in its context (lecture: 20 °C is normal in May but not in
 January). The lecture separates **contextual attributes**, which define the context, from **behavioural attributes**,
-whose values are judged. Here the contextual attributes are the **station** (every station has its own sources and
-level) and the **month** (heating season, sunshine for O3); the behavioural attributes are the six daily means of
-section 1. A day with summer values in January, or with the values of an industrial station at a background station,
-is globally normal, so the point methods of section 1 cannot see it.
+whose values are judged. Here the behavioural attributes are the six daily means of section 1, and four contextual
+attributes are tested: the **station** (every station has its own sources and level), the **month** (heating season,
+sunshine for O3), the **day type** (weekday or weekend, because of traffic) and the **regional level of the day**
+(the other stations on the same date, a proxy for the weather). A day with summer values in January, or with the values
+of an industrial station at a background station, is globally normal, so the point methods of section 1 cannot see it.
 
 ### 2.1 Method: remove the context, then detect
 1. **Context profile:** for every context group (e.g. station XK0001A in January) the median and the MAD of
@@ -530,8 +666,14 @@ is globally normal, so the point methods of section 1 cannot see it.
    day, statistical, one pollutant at a time) and **LOF on the residual vectors** (the best point method of section
    1, all pollutants together), with the same 99th-percentile threshold.
 
-The context granularity is the main parameter: **none** (global, as in section 1), **station**, **station × season**
-or **station × month**; for LOF also n_neighbors (10, 20, 50).
+**Regional level (weather proxy).** The data set contains no meteorological data, but the weather – wind, thermal
+inversion, rain, transported dust – moves all stations of Kosovo together. For the context "station × month + regional level" every log value
+is first compared with the mean log value of the *other* stations on the same day (at least three); the residual of
+this difference within the station × month group shows what is special about the station on that day, after the
+weather of the day has been taken out. Real meteorological data (e.g. ERA5 reanalysis) would be the next step.
+
+The context is the main parameter, from none to the richest: **none**, **station**, **station × season**, **station × month**, **station × month × day type**, **station × month + regional level**; for LOF also
+n_neighbors (10, 20, 50, 100).
 
 ### 2.2 Evaluation with injected contextual anomalies
 As in section 1, 1% known anomalies are added to a copy of the data, now of two
@@ -539,7 +681,7 @@ contextual types: **wrong season** (the real values of the same station from a d
 values in winter) and **wrong station** (the real values of another station on the same date). Every injected day is
 a real day, so its values are normal for the data set as a whole.
 
-Contextual robust z-score, F1 by context:
+Contextual robust z-score, by context:
 
 
 | context | precision | recall | f1 | f1_std | pr_auc | roc_auc |
@@ -548,116 +690,146 @@ Contextual robust z-score, F1 by context:
 | station | 0.037 | 0.038 | 0.037 | 0.013 | 0.019 | 0.585 |
 | station × season | 0.095 | 0.095 | 0.095 | 0.023 | 0.051 | 0.753 |
 | station × month | 0.092 | 0.093 | 0.092 | 0.024 | 0.068 | 0.8 |
+| station × month × day type | 0.107 | 0.108 | 0.107 | 0.026 | 0.063 | 0.792 |
+| station × month + regional level | 0.147 | 0.148 | 0.147 | 0.024 | 0.093 | 0.852 |
 
 
 LOF on the residuals, F1 by n_neighbors (rows) and context (columns):
 
 
-| param | none | station | station × season | station × month |
-|---|---|---|---|---|
-| 10 | 0.002 | 0.105 | 0.165 | 0.205 |
-| 20 | 0.0 | 0.097 | 0.16 | 0.202 |
-| 50 | 0.002 | 0.092 | 0.132 | 0.182 |
+| param | none | station | station × season | station × month | station × month × day type | station × month + regional level |
+|---|---|---|---|---|---|---|
+| 10 | 0.002 | 0.105 | 0.165 | 0.205 | 0.16 | 0.267 |
+| 20 | 0.0 | 0.097 | 0.16 | 0.202 | 0.165 | 0.285 |
+| 50 | 0.002 | 0.092 | 0.132 | 0.182 | 0.16 | 0.3 |
+| 100 | 0.005 | 0.08 | 0.13 | 0.18 | 0.167 | 0.297 |
 
 
 The same for the threshold-free PR-AUC (a random score gets ≈ 0.01):
 
 
-| param | none | station | station × season | station × month |
-|---|---|---|---|---|
-| 10 | 0.008 | 0.046 | 0.114 | 0.132 |
-| 20 | 0.009 | 0.047 | 0.118 | 0.132 |
-| 50 | 0.009 | 0.045 | 0.102 | 0.121 |
+| param | none | station | station × season | station × month | station × month × day type | station × month + regional level |
+|---|---|---|---|---|---|---|
+| 10 | 0.008 | 0.046 | 0.114 | 0.132 | 0.1 | 0.188 |
+| 20 | 0.009 | 0.047 | 0.118 | 0.132 | 0.098 | 0.222 |
+| 50 | 0.009 | 0.045 | 0.102 | 0.121 | 0.096 | 0.229 |
+| 100 | 0.009 | 0.038 | 0.096 | 0.123 | 0.096 | 0.228 |
 
 
 
 ![o2_context_f1](figures/o2_context_f1.png)
 
 **Without context both methods find nothing** (best recall of any global setting: wrong season 0.005,
-wrong station 0.005; the global robust z-score has ROC-AUC 0.50 and PR-AUC
-0.010, exactly the values of a random score): this confirms the lecture – a contextual anomaly cannot be detected by
-looking at the values alone. The station alone already helps, adding the season or the month helps much more, and
-**station × month** gives the best result. LOF on the residuals is clearly better than
-the robust z-score (F1 0.205 vs 0.095), because a wrong day changes several pollutants
-at once only a little, and LOF sees the whole vector while the robust z-score sees one pollutant at a time.
-Recall of the best setting of each method by type:
+wrong station 0.010; the global robust z-score has ROC-AUC 0.50 and PR-AUC
+0.010, exactly the values of a random score): this confirms the lecture – a contextual anomaly cannot be
+detected by looking at the values alone. Every contextual attribute is then judged by what it adds (best F1 of LOF):
+- **station** (0.105) and **month** (station × month 0.205) are the basis:
+  every station and every season has its own normal level;
+- **day type** (0.167) adds nothing:
+  the weekday/weekend difference is small in daily means, and splitting every group in two leaves fewer days to
+  estimate what is usual;
+- the **regional level** (0.300) helps most: a large part of the day-to-day variation is weather that
+  all stations share, and once it is removed, a day that does not belong to its station stands out clearly.
+
+LOF on the residuals is clearly better than the robust z-score (F1 0.300 vs 0.147),
+because a wrong day changes several pollutants at once only a little, and LOF sees the whole vector while the robust
+z-score sees one pollutant at a time. Recall of the best setting of each method by type:
 
 
-| context | method | param | wrong station | wrong season |
+| context | method | param | wrong season | wrong station |
 |---|---|---|---|---|
-| station × month | LOF | 10 | 0.172 | 0.239 |
-| station × season | robust z | 0 | 0.066 | 0.124 |
+| station × month + regional level | LOF | 50 | 0.423 | 0.177 |
+| station × month + regional level | robust z | 0 | 0.254 | 0.04 |
 
 
-**Choice: LOF on the residuals, context station × month, n_neighbors = 10** (F1 = 0.205, PR-AUC =
-0.132, 13× a random score). The highest PR-AUC is reached by
-LOF, context station × month, n_neighbors = 20 (0.132),
-the same context, so the threshold-free measure confirms the choice. The F1 is lower
-than for the point anomalies, because a real day from another month or station is often similar to a normal day of the
-right context (e.g. April and May, or two background stations); only clearly different contexts are found.
+**Choice: LOF on the residuals, context station × month + regional level, n_neighbors = 50** (F1 = 0.300, PR-AUC =
+0.229, 23× a random score). The highest PR-AUC is reached by
+LOF, context station × month + regional level, n_neighbors = 50 (0.229),
+the same context, so the threshold-free measure confirms the choice. The F1 stays lower than for the point anomalies, because a real day
+from another month or station is often similar to a normal day of the right context (e.g. April and May, or two
+background stations); only clearly different contexts are found.
 
 ### 2.3 Contextual anomalies in the real data
-The chosen setting marks **133 station-days**; **114** of them are *not* point anomalies of
-section 1, so the context adds anomalies that the global methods do not see.
+The chosen setting marks **133 station-days**; **119** of them are *not* point anomalies of
+section 1, so the context adds anomalies that the global methods do not see. Regional events (e.g. the dust of March
+2020, which raised all stations together) are *not* contextual anomalies here, because the regional level removes them.
 
 ![o2_value_vs_usual](figures/o2_value_vs_usual.png)
 
-77 of the 133 days are **lower** than usual for their context, the others higher. The most frequent
-pollutant is shown below, and the most anomalies fall in month 7 (26 days):
+76 of the 133 days are **lower** than expected for their context, the others higher. The most frequent
+pollutant is shown below, and the most anomalies fall in month 7 (23 days):
 
 
 | context_driver | days |
 |---|---|
-| SO2 | 42 |
-| CO | 30 |
-| NO2 | 23 |
-| PM10 | 16 |
-| O3 | 13 |
-| PM2_5 | 9 |
+| O3 | 41 |
+| PM2_5 | 24 |
+| CO | 20 |
+| NO2 | 19 |
+| SO2 | 16 |
+| PM10 | 13 |
 
 
 
 
 | month | days |
 |---|---|
-| 1 | 3 |
-| 2 | 9 |
-| 3 | 2 |
-| 4 | 16 |
-| 5 | 14 |
-| 6 | 20 |
-| 7 | 26 |
-| 8 | 10 |
-| 9 | 11 |
-| 10 | 10 |
-| 11 | 5 |
-| 12 | 7 |
+| 1 | 13 |
+| 2 | 16 |
+| 3 | 6 |
+| 4 | 3 |
+| 5 | 6 |
+| 6 | 11 |
+| 7 | 23 |
+| 8 | 18 |
+| 9 | 14 |
+| 10 | 8 |
+| 11 | 4 |
+| 12 | 11 |
 
 
-The strongest contextual anomalies that are not point anomalies (`tables/o2_top_contextual.csv`):
+Station-pollutant-months with three or more contextual anomalies (`tables/o2_repeated_anomalies.csv`):
+
+
+| station_id | context_driver | month | days | share_low |
+|---|---|---|---|---|
+| XK0011A | O3 | 2023-06 | 6 | 1.0 |
+| XK0012A | PM2_5 | 2023-08 | 4 | 1.0 |
+| XK0012A | O3 | 2023-09 | 4 | 0.0 |
+| XK0011A | O3 | 2023-07 | 3 | 1.0 |
+| XK0012A | NO2 | 2021-12 | 3 | 1.0 |
+| XK0012A | O3 | 2024-02 | 3 | 0.0 |
+| XK0008A | NO2 | 2024-03 | 3 | 1.0 |
+| XK0008A | PM2_5 | 2021-07 | 3 | 0.0 |
+
+
+The anomalies are not spread at random: 8 station-pollutant-months have three or more contextual anomalies, the most 6 days of O3 at XK0011A in 2023-06 (100% of them lower than usual). Several unusual days of the same pollutant at the same station in a row are typical of an instrument problem (e.g. an O3 analyzer that measures too low for weeks), not of a single real event.
+
+The strongest contextual anomalies that are not point anomalies (`tables/o2_top_contextual.csv`; the usual value is
+what is expected for the station, the month and the regional level of that day):
 
 
 | station_id | date | context_driver | value | usual_value | context_residual | score_contextual |
 |---|---|---|---|---|---|---|
-| XK0011A | 2024-07-28 | SO2 | 34.17 | 17.47 | 4.24 | 2.5 |
-| XK0008A | 2021-12-10 | SO2 | 27.37 | 7.61 | 6.53 | 2.44 |
-| XK0011A | 2023-07-26 | SO2 | 1.81 | 17.47 | -12.4 | 2.39 |
-| XK0011A | 2023-07-09 | O3 | 5.68 | 64.97 | -11.92 | 2.38 |
-| XK0011A | 2021-09-14 | NO2 | 32.23 | 10.72 | 3.87 | 2.28 |
-| XK0003A | 2020-09-16 | CO | 0.09 | 0.46 | -6.14 | 2.2 |
-| XK0011A | 2021-10-11 | SO2 | 0.72 | 8.12 | -7.25 | 2.15 |
-| XK0008A | 2023-06-03 | O3 | 4.37 | 70.52 | -13.97 | 2.11 |
-| XK0002A | 2021-02-11 | SO2 | 0.37 | 12.0 | -12.76 | 2.09 |
-| XK0010A | 2024-06-23 | SO2 | 23.83 | 5.14 | 3.56 | 1.91 |
-| XK0010A | 2024-04-09 | SO2 | 21.42 | 2.97 | 3.27 | 1.89 |
-| XK0002A | 2021-06-09 | CO | 3.36 | 0.39 | 12.84 | 1.88 |
+| XK0011A | 2023-07-09 | O3 | 5.68 | 66.27 | -25.42 | 4.15 |
+| XK0008A | 2021-07-17 | PM2_5 | 34.03 | 9.2 | 8.1 | 3.21 |
+| XK0011A | 2023-07-01 | O3 | 9.18 | 52.16 | -18.2 | 2.77 |
+| XK0011A | 2023-07-02 | O3 | 8.95 | 47.87 | -17.52 | 2.75 |
+| XK0012A | 2023-08-16 | O3 | 76.89 | 30.13 | 7.96 | 2.65 |
+| XK0012A | 2023-08-02 | PM2_5 | 1.52 | 6.98 | -5.64 | 2.49 |
+| XK0012A | 2023-08-15 | O3 | 93.04 | 43.32 | 6.53 | 2.48 |
+| XK0011A | 2023-07-26 | SO2 | 1.81 | 15.22 | -9.19 | 2.44 |
+| XK0009A | 2023-07-02 | O3 | 72.14 | 39.35 | 5.63 | 2.26 |
+| XK0012A | 2023-08-14 | SO2 | 1.97 | 20.12 | -5.32 | 2.25 |
+| XK0011A | 2023-08-16 | O3 | 7.49 | 51.92 | -11.56 | 2.23 |
+| XK0012A | 2023-08-12 | SO2 | 3.03 | 21.1 | -4.62 | 2.22 |
 
 
-Two kinds stand out. **Too low for the context:** e.g. O3 of a few µg/m³ on a July day when 60–70 µg/m³ is usual, or
-SO2 near zero at a station that usually measures 10–20 µg/m³. A low value is never a global outlier, but it is a
-typical sign of an analyzer that stopped working properly (or a real, very clean day). **Too high for the context:**
-e.g. SO2 or CO several times the usual summer value at an industrial station, which points to a local emission event.
-Both kinds are flagged for a check, not removed.
+Two kinds stand out. **Too low for the context:** e.g. O3 of a few µg/m³ on a summer day when about 50–65 µg/m³ is
+expected, or SO2 near zero at a station that usually measures 15–20 µg/m³. A low value is never a global outlier, but it
+is a typical sign of an analyzer that stopped working properly (or a real, very clean day). **Too high for the
+context:** e.g. PM2.5 or O3 several times what the station and the other stations of the day suggest, which points to a
+local source (a fire, a local emission). Both kinds are flagged for a check, not removed.
 
 
 ## 3. Collective anomalies in the hourly series
@@ -715,15 +887,15 @@ Drift:
 
 | param | precision | recall | f1 | f1_std |
 |---|---|---|---|---|
-| W = 3 d, t = 3 | 0.021 | 0.467 | 0.041 | 0.017 |
-| W = 3 d, t = 4 | 0.02 | 0.256 | 0.037 | 0.02 |
-| W = 3 d, t = 5 | 0.017 | 0.144 | 0.03 | 0.011 |
-| W = 7 d, t = 3 | 0.024 | 0.444 | 0.045 | 0.018 |
-| W = 7 d, t = 4 | 0.023 | 0.256 | 0.042 | 0.022 |
-| W = 7 d, t = 5 | 0.019 | 0.111 | 0.032 | 0.012 |
-| W = 14 d, t = 3 | 0.021 | 0.378 | 0.04 | 0.017 |
-| W = 14 d, t = 4 | 0.022 | 0.222 | 0.04 | 0.021 |
-| W = 14 d, t = 5 | 0.022 | 0.089 | 0.034 | 0.001 |
+| W = 3 d, t = 3 | 0.014 | 0.411 | 0.028 | 0.007 |
+| W = 3 d, t = 4 | 0.011 | 0.167 | 0.02 | 0.008 |
+| W = 3 d, t = 5 | 0.008 | 0.056 | 0.014 | 0.014 |
+| W = 7 d, t = 3 | 0.016 | 0.322 | 0.03 | 0.01 |
+| W = 7 d, t = 4 | 0.011 | 0.144 | 0.019 | 0.004 |
+| W = 7 d, t = 5 | 0.01 | 0.067 | 0.016 | 0.009 |
+| W = 14 d, t = 3 | 0.013 | 0.267 | 0.025 | 0.009 |
+| W = 14 d, t = 4 | 0.011 | 0.122 | 0.019 | 0.002 |
+| W = 14 d, t = 5 | 0.009 | 0.044 | 0.011 | 0.014 |
 
 
 
@@ -735,7 +907,7 @@ Drift:
   chimney); a high threshold is precise but misses the smaller spikes. **Choice: t = 30** (F1 =
   0.310); the injected spikes are only 0.1% of the hours, so even a few hundred natural
   peaks lower the precision.
-- **Drift is not detectable** with this data: the best setting (W = 7 d, t = 3) finds 44% of the
+- **Drift is not detectable** with this data: the best setting (W = 7 d, t = 3) finds 32% of the
   drifts, but 98% of its alarms are false. A slow change up to ×2 in a month
   is within the natural day-to-day differences between stations. In practice drift is found with a reference
   instrument at the same place or with regular calibration checks; the detector is therefore **not used** for flags,
@@ -814,10 +986,10 @@ injected anomalies of that type. The overview of the chosen methods (`tables/o4_
 | type | representation | method | precision | recall | f1 |
 |---|---|---|---|---|---|
 | point | station-day (6 daily means) | LOF + Mahalanobis + KNN + K-Means + SVM, rule: LOF only | 0.512 | 0.516 | 0.514 |
-| contextual | station-day minus the station × month profile | LOF on residuals, context station × month, k = 10 | 0.204 | 0.206 | 0.205 |
+| contextual | station-day minus the station × month profile | LOF on residuals, context station × month + regional level, k = 50 | 0.299 | 0.301 | 0.3 |
 | spike | hourly series | isolated spike, t = 30 | 0.324 | 0.296 | 0.31 |
 | stuck sensor | hourly series | constant non-zero run, L = 4 h | 0.679 | 0.935 | 0.786 |
-| drift | daily series vs other stations | shift of the recent days, W = 7 d, t = 3 | 0.024 | 0.444 | 0.045 |
+| drift | daily series vs other stations | shift of the recent days, W = 7 d, t = 3 | 0.016 | 0.322 | 0.03 |
 
 
 The F1 values are not comparable between the types (different data and different injected faults), but they show how
@@ -825,8 +997,8 @@ reliably each type can be detected: stuck sensors very well, point anomalies wel
 partly, drift not.
 
 ### 4.1 One catalogue
-All results are combined into one catalogue (`data/gold/anomaly_catalogue.parquet`): **2,256 station-days**
-have at least one anomaly, 52 of them more than one type.
+All results are combined into one catalogue (`data/gold/anomaly_catalogue.parquet`): **2,260 station-days**
+have at least one anomaly, 46 of them more than one type.
 
 
 | type | station_days |
@@ -841,16 +1013,18 @@ have at least one anomaly, 52 of them more than one type.
 
 | types | station_days |
 |---|---|
-| spike | 1852 |
-| stuck sensor | 153 |
-| contextual | 107 |
-| point | 92 |
-| point + spike | 19 |
-| point + contextual | 16 |
-| contextual + spike | 7 |
-| spike + stuck sensor | 4 |
-| point + stuck sensor | 3 |
-| point + contextual + spike | 3 |
+| spike | 1853 |
+| stuck sensor | 152 |
+| contextual | 111 |
+| point | 98 |
+| point + spike | 21 |
+| point + contextual | 10 |
+| contextual + spike | 6 |
+| spike + stuck sensor | 3 |
+| point + contextual + stuck sensor | 3 |
+| point + contextual + spike | 1 |
+| contextual + spike + stuck sensor | 1 |
+| contextual + stuck sensor | 1 |
 
 
 The types overlap little: each representation finds its own anomalies, which is why all of them are needed to find
@@ -868,15 +1042,15 @@ The types overlap little: each representation finds its own anomalies, which is 
 | year | point | contextual | spike | stuck sensor |
 |---|---|---|---|---|
 | 2019 | 2 | 1 | 147 | 3 |
-| 2020 | 56 | 31 | 639 | 8 |
-| 2021 | 36 | 20 | 320 | 6 |
-| 2022 | 8 | 15 | 337 | 1 |
-| 2023 | 12 | 31 | 196 | 5 |
-| 2024 | 19 | 35 | 246 | 137 |
+| 2020 | 56 | 24 | 639 | 8 |
+| 2021 | 36 | 27 | 320 | 6 |
+| 2022 | 8 | 12 | 337 | 1 |
+| 2023 | 12 | 46 | 196 | 5 |
+| 2024 | 19 | 23 | 246 | 137 |
 
 
 Point anomalies are most frequent in 2020 (56 station-days, among them the dust
-episode of March 2020 and the SO2 episode in Mitrovica in May 2020, section 1.11). The stuck-sensor alarms
+episode of March 2020 and the SO2 episode in Mitrovica in May 2020, section 1.12). The stuck-sensor alarms
 are concentrated at Brezovica (XK0007A, NO2 at zero) and Palaj (XK0010A), which shows that a few instruments cause
 most of the technical faults.
 
@@ -887,7 +1061,9 @@ most of the technical faults.
 | Every choice evaluated with injected anomalies of its type (3 seeds) | the real data has no labels; injection gives precision, recall and F1 |
 | Point anomalies: LOF, threshold 99th percentile; Mahalanobis as an optional addition | best F1 of all methods and combination rules; Mahalanobis adds the zero readings |
 | Majority voting is not used | the weaker methods outvote LOF (lower F1) |
-| Contextual anomalies: LOF on residuals of the station × month profile | without context the F1 is ≈ 0 |
+| Isolation Forest only as a comparison | not in the lectures and clearly weaker than LOF on this data |
+| Threshold: 99th percentile | the method ranking does not depend on the injected share; the real data has ≈ 0.5–1% clear outliers (LOF > 1.5) |
+| Contextual anomalies: LOF on the residuals of the station × month profile after removing the regional level of the day | without context the F1 is ≈ 0; the regional level (weather proxy) gives the best context |
 | Temporal anomalies: isolated-spike and stuck-sensor detectors; drift not flagged | drift cannot be separated from natural differences without a reference instrument |
 | Static thresholds (\|z\| > 3, χ², Grubbs) are not used | the data is not Gaussian; the χ² threshold marks several times the expected share |
 | Anomalies are flagged, not removed | many are real events (dust, smog, local emissions); removal needs the reason for every anomaly |

@@ -13,18 +13,18 @@ from utils import COLORS, GRID, INK_2, plt, save_figure
 def context_f1(evaluation: pl.DataFrame) -> str:
     """F1 of the contextual robust z-score and of LOF (every n_neighbors) for every context, from none to finest."""
     order = list(CONTEXTS)
-    fig, ax = plt.subplots(figsize=(7.5, 3.8))
+    fig, ax = plt.subplots(figsize=(10, 4.2))
     settings = evaluation.select("method", "param").unique().sort("method", "param")
-    lof_colors = iter([COLORS[1], COLORS[3], COLORS[6]])
+    lof_colors = iter([COLORS[1], COLORS[3], COLORS[6], COLORS[4], COLORS[5]])  # one per n_neighbors value
     for method, k in settings.iter_rows():
         d = evaluation.filter((pl.col("method") == method) & (pl.col("param") == k))
         d = d.sort(pl.col("context").replace_strict({c: j for j, c in enumerate(order)}))
         label = "robust z (largest |residual|)" if method == "robust z" else f"LOF on residuals, k = {k}"
         ax.errorbar(range(len(order)), d["f1"], yerr=d["f1_std"], marker="o", ms=5, lw=2, capsize=3,
                     color=INK_2 if method == "robust z" else next(lof_colors), label=label)
-    ax.set_xticks(range(len(order)), order)
+    ax.set_xticks(range(len(order)), [c.replace(" + ", "\n+ ") for c in order], fontsize=8)
     ax.set(xlabel="context (contextual attributes)", ylabel="F1", ylim=(0, None))
-    ax.set_title("Contextual anomalies: invisible without context (F1 ≈ 0), best with station × month")
+    ax.set_title("Contextual anomalies: invisible without context (F1 ≈ 0), best with the regional level of the day")
     ax.legend()
     return save_figure(fig, "o2_context_f1")
 

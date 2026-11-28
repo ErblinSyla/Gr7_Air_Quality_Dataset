@@ -1,13 +1,14 @@
 """o2 – Contextual anomalies: station-days that are normal for the data set as a whole, but not for their context.
 
 Lecture (week VI): contextual attributes decide whether the value of a behavioural attribute is normal (20 °C is
-normal in May, not in January). Here the contextual attributes are the station and the month, the behavioural
-attributes are the six daily means. The context is removed first – every value becomes a robust z-score within its
-context group (residual) – and the anomaly methods then work on the residuals:
+normal in May, not in January). Here the contextual attributes are the station, the month, the day type (weekday or
+weekend) and the regional level of the day (the other stations, a proxy for the weather); the behavioural attributes
+are the six daily means. The context is removed first – every value becomes a robust z-score within its context group
+(residual) – and the anomaly methods then work on the residuals:
 - contextual robust z-score: the largest |residual| of the day (statistical, univariate);
 - LOF on the residual vectors (density-based, multivariate; the best point method of o1).
-The context granularity (none, station, station × season, station × month) and n_neighbors are analysed with
-injected contextual anomalies. Flags are stored in data/gold/anomalies_contextual.parquet.
+The context (from none to station × month + regional level) and n_neighbors are analysed with injected contextual
+anomalies. Flags are stored in data/gold/anomalies_contextual.parquet.
 """
 
 from __future__ import annotations
@@ -31,8 +32,15 @@ from steps.second_phase.common import (
 from steps.second_phase.o1_point_anomalies import lof_score
 from utils import scan, table, write
 
-CONTEXTS = {"none": [], "station": ["station_id"], "station × season": ["station_id", "season"],
-            "station × month": ["station_id", "month"]}
+CONTEXTS = {  # context name → grouping columns (from no context to the richest one)
+    "none": [],
+    "station": ["station_id"],
+    "station × season": ["station_id", "season"],
+    "station × month": ["station_id", "month"],
+    "station × month × day type": ["station_id", "month", "day_type"],
+    "station × month + regional level": ["station_id", "month"],
+}
+REGIONAL = "station × month + regional level"  # the values are first compared with the other stations of the day
 INJECTED = ["wrong season", "wrong station"]
 KEY = ["context", "method", "param"]
 
@@ -75,14 +83,55 @@ def grouped(days: pl.DataFrame, context: str) -> tuple[pl.DataFrame, list[str]]:
     return (days, keys) if keys else (days.with_columns(pl.lit(0).alias("_all")), ["_all"])
 
 
+def with_day_type(days: pl.DataFrame) -> pl.DataFrame:
+    """Add the day type (weekday / weekend): traffic, and with it NO2 and CO, is lower at the weekend."""
+    weekend = pl.col("date").dt.weekday() >= 6
+    return days.with_columns(pl.when(weekend).then(pl.lit("weekend")).otherwise(pl.lit("weekday")).alias("day_type"))
+
+
+def regional_level(f: str) -> pl.Expr:
+    """Mean log(1 + value) of the *other* stations on the same date (at least 3 of them), else null.
+
+    The weather (wind, inversion, rain, transported dust) moves all stations together; subtracting this regional level
+    keeps only what is special about the station on that day. The data set has no meteorological data, so the other
+    stations are the best available proxy for the weather of the day."""
+    lv = pl.col(f).log1p()
+    total, count = lv.sum().over("date"), lv.count().over("date")
+    return pl.when(count >= 4).then((total - lv) / (count - 1))
+
+
+def log_values(days: pl.DataFrame, context: str) -> pl.DataFrame:
+    """log(1 + value) of every pollutant; for the regional context relative to the other stations of the day
+    (null where fewer than three other stations measured the pollutant)."""
+    if context != REGIONAL:
+        return days.with_columns(pl.col(f).log1p() for f in FEATURES)
+    return days.with_columns((pl.col(f).log1p() - regional_level(f)).alias(f) for f in FEATURES)
+
+
 def residuals(days: pl.DataFrame, context: str) -> np.ndarray:
-    """Remove the context: robust z-score of log(1 + value) of every pollutant within its context group.
+    """Remove the context: robust z-score of the log values of every pollutant within its context group.
 
     The log makes the skewed values more symmetric; the median and the MAD describe what is usual for the group
     without being pulled by its outliers. With context "none" the result is the global robust z-score.
     """
-    data, keys = grouped(days, context)
-    return data.select(robust_z(pl.col(f).log1p(), keys).alias(f) for f in FEATURES).to_numpy()
+    data, keys = grouped(log_values(days, context), context)
+    r = data.select(robust_z(pl.col(f), keys).alias(f) for f in FEATURES).to_numpy()
+    if context == REGIONAL:  # days without a regional reference: the residual of station × month alone
+        r = np.where(np.isnan(r), residuals(days, "station × month"), r)
+    return r
+
+
+def usual_log(days: pl.DataFrame, context: str) -> np.ndarray:
+    """The usual log value of every pollutant for the context of every day (the median of its group).
+
+    For the regional context it is the usual level relative to the other stations plus today's regional level, i.e.
+    what would be expected at this station on this day; without a regional reference the station × month median."""
+    data, keys = grouped(log_values(days, context), context)
+    typical = data.select(pl.col(f).median().over(keys) for f in FEATURES).to_numpy()
+    if context != REGIONAL:
+        return typical
+    typical = typical + days.select(regional_level(f) for f in FEATURES).to_numpy()
+    return np.where(np.isnan(typical), usual_log(days, "station × month"), typical)
 
 
 def contextual_score(days: pl.DataFrame, context: str, method: str, k: int = 0) -> np.ndarray:
@@ -123,8 +172,7 @@ def detect(days: pl.DataFrame, best: dict) -> pl.DataFrame:
     r = residuals(days, best["context"])
     score = contextual_score(days, best["context"], best["method"], int(best["param"]))
     strongest = np.abs(r).argmax(axis=1)
-    data, keys = grouped(days, best["context"])
-    usual = data.select(pl.col(f).log1p().median().over(keys).exp() - 1 for f in FEATURES).to_numpy()
+    usual = np.expm1(usual_log(days, best["context"]))
     rows = np.arange(len(r))
     return days.select("station_id", "date", "month", *FEATURES).with_columns(
         pl.Series("score_contextual", score),
@@ -138,7 +186,7 @@ def detect(days: pl.DataFrame, best: dict) -> pl.DataFrame:
 
 def run() -> SimpleNamespace:
     """o2 pipeline: injected contextual anomalies → best context and method → detection on the real data."""
-    days = load_station_days()
+    days = with_day_type(load_station_days())
     ev, found = evaluate(days)
     summary = mean_over_seeds(ev, KEY)
     best_by_method = best_per(summary, "method", "param").sort("method")
@@ -167,6 +215,9 @@ def run() -> SimpleNamespace:
                              .pivot(on="type", index=["method", "param"], values="recall").sort("method", "param"),
                              "o2_global_recall_by_type"),
         best=best, best_by_method=best_by_method, flags=flags,
+        repeated=table(alarms.group_by("station_id", "context_driver", pl.col("date").dt.strftime("%Y-%m").alias("month"))
+                       .agg(pl.len().alias("days"), (pl.col("value") < pl.col("usual_value")).mean().alias("share_low"))
+                       .filter(pl.col("days") >= 3).sort("days", descending=True), "o2_repeated_anomalies"),
         n_alarms=alarms.height,
         n_only_contextual=alarms.filter(~pl.col("point_anomaly")).height,
         by_driver=table(alarms.group_by("context_driver").len("days").sort("days", descending=True),

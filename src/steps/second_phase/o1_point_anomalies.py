@@ -6,6 +6,8 @@ One method from every family of the lectures is applied and its parameters are a
 - clustering-based: K-Means (distance to the nearest centroid);
 - statistical: Mahalanobis distance (classic and robust covariance), with the univariate z-score as baseline;
 - boundary-based: one-class SVM.
+Isolation Forest (the most common method in practice, not part of the lectures) and the univariate z-score are
+evaluated as comparisons; they do not take part in the final decision.
 
 Evaluation: as in the exercises, known anomalies of three types (gain error, sensor at zero, PM2.5 > PM10) are added
 to a copy of the data, so precision, recall and F1 can be measured for every setting. Detection: every method runs
@@ -23,6 +25,7 @@ from scipy.spatial.distance import cdist
 from sklearn.cluster import KMeans
 from sklearn.covariance import EmpiricalCovariance, MinCovDet
 from sklearn.decomposition import PCA
+from sklearn.ensemble import IsolationForest
 from sklearn.neighbors import LocalOutlierFactor, NearestNeighbors
 from sklearn.svm import OneClassSVM
 
@@ -39,8 +42,10 @@ from steps.second_phase.common import (
 )
 from utils import table, write
 
-METHODS = ["KNN", "LOF", "K-Means", "Mahalanobis", "One-class SVM"]
+METHODS = ["KNN", "LOF", "K-Means", "Mahalanobis", "One-class SVM"]  # the methods of the lectures (decision)
 BASELINE = "z-score"
+COMPARISON = ["Isolation Forest", BASELINE]  # evaluated next to the lecture methods, not used for the decision
+ALL = [*METHODS, *COMPARISON]
 MAHALANOBIS = ["classic", "robust (MCD)", "classic, log values"]
 INJECTED = ["gain error", "sensor at zero", "PM2.5 > PM10"]
 RULES = {  # how the flags of the five methods are combined into one decision (evaluated in evaluate_rules)
@@ -54,7 +59,8 @@ KEY = ["method", "variant", "param"]
 
 # ---------------------------------------------------------------- injected anomalies -------------------------------
 
-def inject_anomalies(x: np.ndarray, seed: int) -> tuple[np.ndarray, np.ndarray, pl.DataFrame]:
+def inject_anomalies(x: np.ndarray, seed: int,
+                     share: float | None = None) -> tuple[np.ndarray, np.ndarray, pl.DataFrame]:
     """Add known point anomalies to a copy of the data (the idea of the 5 anomalous customers in the exercise).
 
     `injected_share` of the rows are copied from random real station-days and changed in one of three ways, each the
@@ -65,11 +71,12 @@ def inject_anomalies(x: np.ndarray, seed: int) -> tuple[np.ndarray, np.ndarray, 
     The other pollutants of the day stay real, so most anomalies are *contextual within the day*: the changed value
     alone may look normal, only its combination with the other pollutants is unusual.
 
+    `share` overrides `injected_share` (used to test how the results depend on the number of anomalies).
     Returns the data with the anomalies appended at the end, the true labels and one row per anomaly (type,
     pollutant, factor).
     """
     rng = np.random.default_rng(seed)
-    n = round(O["injected_share"] * len(x))
+    n = round((share or O["injected_share"]) * len(x))
     medians = np.median(x, axis=0)
     pm10, pm25 = FEATURES.index("PM10"), FEATURES.index("PM2_5")
     fake, info = [], []
@@ -155,6 +162,19 @@ def ocsvm_score(z: np.ndarray, gamma: float, nu: float) -> np.ndarray:
     return -OneClassSVM(kernel="rbf", gamma=gamma, nu=nu).fit(z).decision_function(z)
 
 
+def iforest_score(z: np.ndarray, max_samples: int, n_estimators: int) -> np.ndarray:
+    """Isolation Forest score (comparison method, not in the lectures): how easily a point is isolated.
+
+    Many random trees split the data at random values of random pollutants; a point that ends up alone after few
+    splits (short average path length) is different from the rest. max_samples is the number of points every tree
+    sees (small: the trees see the broad structure; large: also the details), n_estimators the number of trees.
+    The score is −score_samples (larger = easier to isolate = more anomalous).
+    """
+    forest = IsolationForest(n_estimators=n_estimators, max_samples=min(max_samples, len(z)),
+                             random_state=O["seed"]).fit(z)
+    return -forest.score_samples(z)
+
+
 def zscore_score(z: np.ndarray) -> np.ndarray:
     """Statistical univariate baseline: the largest |z-score| of the row over all pollutants.
 
@@ -167,7 +187,8 @@ def method_score(method: str, variant: str, param: float, x: np.ndarray) -> np.n
     """Score of one setting (method, variant, numeric parameter) on the raw data x; used for evaluation and detection.
 
     KNN: variant "metric, mean|kth", param k; LOF: param n_neighbors; K-Means: param K; Mahalanobis: variant = type
-    of covariance; one-class SVM: variant "nu=…", param gamma; z-score: no parameter.
+    of covariance; one-class SVM: variant "nu=…", param gamma; Isolation Forest: variant "trees=…", param
+    max_samples; z-score: no parameter.
     """
     z = standardize(x)
     if method == "KNN":
@@ -181,6 +202,8 @@ def method_score(method: str, variant: str, param: float, x: np.ndarray) -> np.n
         return mahalanobis_score(x, variant)
     if method == "One-class SVM":
         return ocsvm_score(z, param, float(variant.removeprefix("nu=")))
+    if method == "Isolation Forest":
+        return iforest_score(z, int(param), int(variant.removeprefix("trees=")))
     return zscore_score(z)
 
 
@@ -203,6 +226,7 @@ def settings() -> list[tuple[str, str, float]]:
     grid += [("K-Means", "-", k) for k in O["kmeans_k"]]
     grid += [("Mahalanobis", v, 0) for v in MAHALANOBIS]
     grid += [("One-class SVM", f"nu={nu}", g) for nu in O["ocsvm_nu"] for g in O["ocsvm_gamma"]]
+    grid += [("Isolation Forest", f"trees={t}", m) for t in O["iforest_trees"] for m in O["iforest_max_samples"]]
     grid.append((BASELINE, "-", 0))
     return [(m, v, float(p)) for m, v, p in grid]
 
@@ -231,7 +255,7 @@ def evaluate(x: np.ndarray) -> tuple[pl.DataFrame, pl.DataFrame]:
 def best_settings(summary: pl.DataFrame) -> pl.DataFrame:
     """For every method the setting with the highest mean F1 at the main threshold (smaller parameter on a tie)."""
     main = summary.filter(pl.col("percentile") == O["threshold_percentile"])
-    order = {m: i for i, m in enumerate([*METHODS, BASELINE])}
+    order = {m: i for i, m in enumerate(ALL)}
     return best_per(main, "method", "param").sort(pl.col("method").replace_strict(order))
 
 
@@ -263,7 +287,7 @@ def recall_by(found: pl.DataFrame, best: pl.DataFrame, by: str) -> pl.DataFrame:
     """Recall of the best setting of every method, split by the type or the changed pollutant of the anomaly."""
     return (found.join(best.select(KEY), on=KEY)
             .group_by(by, "method").agg(pl.col("detected").mean().alias("recall"))
-            .pivot(on="method", index=by, values="recall").select(by, *METHODS, BASELINE).sort(by))
+            .pivot(on="method", index=by, values="recall").select(by, *ALL).sort(by))
 
 
 def elbow(x: np.ndarray) -> pl.DataFrame:
@@ -306,9 +330,39 @@ def auc_check(main: pl.DataFrame, best: pl.DataFrame) -> pl.DataFrame:
     return chosen.join(by_auc, on="method", how="left").with_columns(same.alias("same_choice"))
 
 
+def threshold_sensitivity(x: np.ndarray, best: pl.DataFrame) -> pl.DataFrame:
+    """Does the result depend on how many anomalies are injected? (the "1% injected, 1% threshold" question)
+
+    The best setting of every method is evaluated with `sensitivity_shares` injected anomalies (one seed each): the
+    threshold-free PR-AUC and the percentile that maximises F1. If the ranking of the methods stays the same while the
+    best percentile follows the injected share, the *method* choice does not depend on the injection, and only the
+    *threshold* is a separate decision that cannot be learned from injected data.
+    """
+    chosen = {r["method"]: r for r in best.iter_rows(named=True)}
+    rows = []
+    for share in O["sensitivity_shares"]:
+        x_eval, actual, _ = inject_anomalies(x, O["eval_seeds"][0], share)
+        for m in ALL:
+            score = method_score(m, chosen[m]["variant"], chosen[m]["param"], x_eval)
+            f1_by_p = {p: precision_recall_f1(actual, flag(score, p))["f1"] for p in O["sensitivity_percentiles"]}
+            best_p = max(f1_by_p, key=f1_by_p.get)
+            rows.append({"injected_pct": 100 * share, "method": m, **ranking_metrics(actual, score),
+                         "best_percentile": best_p, "f1_at_best": f1_by_p[best_p]})
+    return pl.DataFrame(rows)
+
+
+def lof_share(score: np.ndarray) -> pl.DataFrame:
+    """Share of the real station-days above common LOF limits (LOF ≈ 1 = as dense as the neighbours).
+
+    An estimate of how many real outliers the data contains that does not use any injected anomaly: if it is close to
+    1%, the 99th-percentile threshold agrees with the data itself."""
+    return pl.DataFrame([{"lof_above": limit, "days": int((score > limit).sum()),
+                          "pct": 100 * float((score > limit).mean())} for limit in O["lof_limits"]])
+
+
 def name(method: str) -> str:
     """Column-friendly name of a method: "K-Means" → "kmeans", "One-class SVM" → "ocsvm"."""
-    return {"One-class SVM": "ocsvm"}.get(method, method.lower().replace("-", ""))
+    return {"One-class SVM": "ocsvm", "Isolation Forest": "iforest"}.get(method, method.lower().replace("-", ""))
 
 
 def detect(days: pl.DataFrame, best: pl.DataFrame, rule: str) -> pl.DataFrame:
@@ -321,7 +375,7 @@ def detect(days: pl.DataFrame, best: pl.DataFrame, rule: str) -> pl.DataFrame:
     x = days.select(FEATURES).to_numpy()
     z = standardize(x)
     chosen = {r["method"]: r for r in best.iter_rows(named=True)}
-    scores = {m: method_score(m, chosen[m]["variant"], chosen[m]["param"], x) for m in METHODS}
+    scores = {m: method_score(m, chosen[m]["variant"], chosen[m]["param"], x) for m in [*METHODS, "Isolation Forest"]}
     p = O["threshold_percentile"]
     strongest = np.abs(z).argmax(axis=1)
     pc = PCA(n_components=2).fit_transform(z)
@@ -332,8 +386,8 @@ def detect(days: pl.DataFrame, best: pl.DataFrame, rule: str) -> pl.DataFrame:
         pl.Series("driver_z", z[np.arange(len(z)), strongest]),
         pl.Series("pc1", pc[:, 0]), pl.Series("pc2", pc[:, 1]),
     )
-    decision = RULES[rule]({m: flag(s, p) for m, s in scores.items()})
-    return out.with_columns(pl.sum_horizontal(pl.selectors.starts_with("outlier_")).alias("n_methods"),
+    decision = RULES[rule]({m: flag(scores[m], p) for m in METHODS})
+    return out.with_columns(pl.sum_horizontal(f"outlier_{name(m)}" for m in METHODS).alias("n_methods"),
                             pl.Series("point_anomaly", decision))
 
 
@@ -394,6 +448,12 @@ def run() -> SimpleNamespace:
                                                                         "f1"), "o1_threshold_evaluation"),
         best=best, rule=rule,
         auc=table(auc_check(main, best), "o1_auc_check"),
+        iforest=table(of("Isolation Forest"), "o1_iforest_evaluation"),
+        sensitivity=table(threshold_sensitivity(x, best), "o1_threshold_sensitivity"),
+        lof_share=table(lof_share(flags["score_lof"].to_numpy()), "o1_lof_share"),
+        lof_cut=float(np.percentile(flags["score_lof"].to_numpy(), O["threshold_percentile"])),
+        iforest_lof_jaccard=float(((flags["outlier_iforest"] == 1) & (flags["outlier_lof"] == 1)).sum()
+                                  / ((flags["outlier_iforest"] == 1) | (flags["outlier_lof"] == 1)).sum()),
         rules=table(rules, "o1_combination_rules"),
         rules_by_type=table(rules_by_type, "o1_combination_rules_by_type"),
         by_type=table(recall_by(found, best, "type"), "o1_recall_by_type"),
