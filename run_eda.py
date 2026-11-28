@@ -114,3 +114,31 @@ def main() -> None:
         fig.tight_layout()
         fig.savefig(figures / f"scatter_{x.lower()}_{y.lower()}.png", dpi=160)
         plt.close(fig)
+
+    strongest = pl.DataFrame(pairs).with_columns(pl.col("pearson_r").abs().alias("abs_r")).sort(
+        "abs_r", descending=True).head(5)
+    lines = ["# Phase II: Exploratory data analysis", "",
+             f"Input: `{source.relative_to(ROOT) if source.is_relative_to(ROOT) else source}`; "
+             f"{df.height:,} rows × {df.width} columns.", "",
+             "The input is the Phase I p4 stratified sample. Concentration summaries use measured/imputed pollutant "
+             "columns as supplied by p4; station and season are categorical, while timestamp/key columns are not "
+             "treated as measurements. The script does not alter the input.", "",
+             "## Summary statistics", "", "`tables/summary_by_pollutant.csv` includes count, null count, mean, "
+             "median, sample standard deviation and variance, min/max, quartiles and 5th/95th percentiles. CO is "
+             "reported in mg/m³; other pollutants in µg/m³.", "",
+             "## Multivariate analysis", "", "Pearson correlations are pairwise complete; the pair table records "
+             "the available pair count. The plots show PM10 vs PM2.5 and NO2 vs NO; scatter points are capped "
+             "deterministically at 8,000 for readability, while correlation calculations use all complete pairs.", "",
+             "### Strongest absolute correlations", "",
+             "| Pollutant A | Pollutant B | Complete pairs | Pearson r |", "|---|---|---:|---:|"]
+    lines.extend(f"| {r['pollutant_a']} | {r['pollutant_b']} | {r['complete_pairs']:,} | "
+                 f"{r['pearson_r']:.3f} |" for r in strongest.iter_rows(named=True))
+    lines += ["", "![Correlation heatmap](figures/correlation_heatmap.png)", "",
+              "![PM10 vs PM2.5](figures/scatter_pm10_pm2_5.png)", "",
+              "![NO2 vs NO](figures/scatter_no2_no.png)", ""]
+    (out / "report_eda.md").write_text("\n".join(lines), encoding="utf-8")
+    print(f"EDA complete: {df.height:,} rows; outputs in {out.relative_to(ROOT)}")
+
+
+if __name__ == "__main__":
+    main()
