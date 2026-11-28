@@ -1,6 +1,7 @@
 driver,outlier_days
-PM10,23
-CO,21
-PM2_5,19
-SO2,17
-NO2,14
+CO,29
+PM10,26
+SO2,26
+O3,24
+NO2,21
+PM2_5,7

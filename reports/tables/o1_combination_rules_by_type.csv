@@ -1,0 +1,5 @@
+rule,gain error,sensor at zero,PM2.5 > PM10
+LOF only,0.466667,0.439394,0.643939
+LOF or Mahalanobis,0.540741,0.681818,0.643939
+≥ 2 of 5 methods,0.481481,0.424242,0.265152
+≥ 3 of 5 methods,0.377778,0.159091,0.212121

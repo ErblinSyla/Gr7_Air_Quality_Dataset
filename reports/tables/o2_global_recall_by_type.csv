@@ -1,0 +1,5 @@
+method,param,wrong season,wrong station
+LOF,10,0.004975,0.0
+LOF,20,0.0,0.0
+LOF,50,0.0,0.005051
+robust z,0,0.004975,0.005051

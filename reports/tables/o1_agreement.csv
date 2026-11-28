@@ -1,4 +1,11 @@
 pair,common,jaccard
-KNN & LOF,55,0.260664
-KNN & K-Means,64,0.316832
-LOF & K-Means,27,0.112971
+KNN & LOF,49,0.225806
+KNN & K-Means,68,0.343434
+KNN & Mahalanobis,19,0.076923
+KNN & One-class SVM,100,0.60241
+LOF & K-Means,25,0.103734
+LOF & Mahalanobis,24,0.099174
+LOF & One-class SVM,52,0.242991
+K-Means & Mahalanobis,31,0.131915
+K-Means & One-class SVM,59,0.285024
+Mahalanobis & One-class SVM,27,0.112971

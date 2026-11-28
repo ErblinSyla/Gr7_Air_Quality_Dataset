@@ -2,7 +2,8 @@
 section (sections); then builds the report of every phase that was run completely.
 
 Phase I  (first_phase):  p1–p5 and appendix x → reports/report_phase1.md
-Phase II (second_phase): o1 outlier detection → reports/report_phase2.md
+Phase II (second_phase): anomaly detection – o1 point, o2 contextual, o3 collective (hourly), o4 summary
+                         → reports/report_phase2.md
 
 Usage: python run_all.py [phase1 | phase2 | p1 o1 ...]   (no argument: both phases)"""
 
@@ -30,7 +31,10 @@ PHASES = {
         "x": "first_phase.x_beyond_lectures",
     },
     "phase2": {
-        "o1": "second_phase.o1_outlier_detection",
+        "o1": "second_phase.o1_point_anomalies",
+        "o2": "second_phase.o2_contextual_anomalies",
+        "o3": "second_phase.o3_collective_anomalies",
+        "o4": "second_phase.o4_anomaly_summary",
     },
 }
 STEPS = {name: module for steps in PHASES.values() for name, module in steps.items()}
@@ -136,11 +140,27 @@ it is applied.
 def build_report_phase2() -> None:
     """Build reports/report_phase2.md from the sections of phase II."""
     sections = "\n\n".join((SECTIONS / f"{name}.md").read_text(encoding="utf-8") for name in PHASES["phase2"])
-    report = f"""# Phase II report: outlier detection in the air quality data of Kosovo
+    report = f"""# Phase II report: anomaly detection in the air quality data of Kosovo
 
-**Data set:** the station-day means of phase I (`data/gold/daily.parquet`, EEA Air Quality, country XK, E1a,
-CC BY 4.0). **Methods** (from the exercises): KNN distance, Local Outlier Factor and K-Means. This phase only
-detects outliers; no value is changed or removed.
+**Data set:** the cleaned measurements of phase I (EEA Air Quality, country XK, E1a, CC BY 4.0): station-day means
+(`data/gold/daily.parquet`) and hourly series (`data/gold/hourly_long/`). This phase only **detects** anomalies; no
+value is changed or removed.
+
+**Approach.** An anomaly (outlier) is an object that differs from most other objects. Following the lecture it can be
+caused by a measurement error, by natural variation or by a different mechanism (a real pollution episode), and it has
+one of three structures. Every structure needs its own representation of the data and its own methods:
+
+| Section | Type of anomaly (lecture) | Representation | Methods | Evaluated with injected |
+|---|---|---|---|---|
+| 1 | point | station-day: six daily means | KNN distance, LOF, K-Means, Mahalanobis, one-class SVM (z-score as baseline) | gain error, sensor at zero, PM2.5 > PM10 |
+| 2 | contextual | station-day relative to its station × month | robust z-score and LOF on the context residuals | wrong season, wrong station |
+| 3 | collective | hourly series of every station and pollutant | isolated-spike, stuck-sensor and drift detectors | spikes, frozen runs, drifts |
+| 4 | summary | all flags together | catalogue of all anomalies | – |
+
+The setting is **unsupervised** (no labels), so every method follows the three steps of the lecture – build a profile
+of normal behaviour, measure how far every observation is from it (the anomaly score), flag the largest scores – and
+every parameter is chosen with **known anomalies injected into a copy of the data**, as in the exercises
+(precision, recall, F1).
 
 {sections}
 """
