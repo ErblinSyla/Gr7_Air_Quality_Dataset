@@ -82,3 +82,16 @@ def main() -> None:
         tables / "correlation_matrix.csv")
     pl.DataFrame(pairs).with_columns(pl.col("pearson_r").abs().alias("abs_r")).sort(
         "abs_r", descending=True).drop("abs_r").write_csv(tables / "correlation_pairs.csv")
+
+    fig, ax = plt.subplots(figsize=(9, 7))
+    im = ax.imshow(corr, cmap="coolwarm", vmin=-1, vmax=1)
+    ax.set_xticks(range(len(numeric)), numeric, rotation=40, ha="right")
+    ax.set_yticks(range(len(numeric)), numeric)
+    ax.set_title("Pearson correlation between hourly pollutant concentrations")
+    for i in range(len(numeric)):
+        for j in range(len(numeric)):
+            ax.text(j, i, f"{corr[i, j]:.2f}", ha="center", va="center", fontsize=8)
+    fig.colorbar(im, ax=ax, label="Pearson r")
+    fig.tight_layout()
+    fig.savefig(figures / "correlation_heatmap.png", dpi=160)
+    plt.close(fig)
